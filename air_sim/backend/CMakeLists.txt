@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(mesh_server)
+project(air_sim)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,18 +19,18 @@ if(NOT EXISTS ${CROW_INCLUDE_DIR})
     message(FATAL_ERROR "Crow headers not found at ${CROW_INCLUDE_DIR}")
 endif()
 
-add_executable(mesh_server main.cpp)
+add_executable(air_sim main.cpp)
 
-target_compile_definitions(mesh_server PRIVATE
+target_compile_definitions(air_sim PRIVATE
     DATA_DIR="${CMAKE_SOURCE_DIR}/data"
 )
 
-target_include_directories(mesh_server PRIVATE
+target_include_directories(air_sim PRIVATE
     ${ASIO_INCLUDE_DIR}
     ${CROW_INCLUDE_DIR}
 )
 
-target_link_libraries(mesh_server PRIVATE
+target_link_libraries(air_sim PRIVATE
     Boost::system
     glm::glm
     nlohmann_json::nlohmann_json
@@ -38,5 +38,5 @@ target_link_libraries(mesh_server PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(mesh_server PRIVATE ws2_32 wsock32)
+    target_link_libraries(air_sim PRIVATE ws2_32 wsock32)
 endif()
