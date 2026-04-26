@@ -17,13 +17,75 @@
             overflow: hidden;
         }
 
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
+        #app {
             position: relative;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #canvas-container {
+            position: absolute;
+            width:100%;
+            height:100%;
         }
         .toggle-button.clicked {
             color: red;
+        }
+        #sidebar {
+            z-index: 10;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            width: 20%;
+            min-width: 160px;
+            padding: .5em;
+            border: 2px solid;
+            background: black;
+            gap: 0.3em;
+            overflow: hidden;
+        }
+        .config-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3em;
+            border-top: 1px solid #333;
+            padding-top: 0.4em;
+            margin-top: 0.2em;
+        }
+        .config-section-label {
+            font-size: 0.7em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        #sidebar label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82em;
+        }
+        #sidebar input[type="number"] {
+            width: 65px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 2px 4px;
+            flex-shrink: 0;
+        }
+        .slider-row {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.82em;
+            gap: 0.1em;
+        }
+        .slider-row-header {
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-row input[type="range"] {
+            width: 100%;
         }
     </style>
 </head>
@@ -31,9 +93,40 @@
     <div id="app">
         <div id="sidebar">
             <button id="moveACButton" class="toggle-button">Move AC Unit</button>
-            <button id="startSimButton" class="toggle-button">Start Simulation</button>
-            <div id="console">
+            <button id="showGridButton" class="toggle-button">Show Grid</button>
+
+            <div class="config-section">
+                <span class="config-section-label">AC Unit</span>
+                <label>Outflow Velocity <input type="number" id="outVelInput" value="1.0" step="0.1" min="0.1"></label>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Outflow Angle</span><span id="outflowAngleDisplay">0°</span></div>
+                    <input type="range" id="outflowAngleInput" value="0" min="0" max="90" step="1" autocomplete="off">
+                </div>
+                <label>Intake Velocity <input type="number" id="inVelInput" value="1.0" step="0.1" min="0.1"></label>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Intake Angle</span><span id="intakeAngleDisplay">45°</span></div>
+                    <input type="range" id="intakeAngleInput" value="45" min="0" max="90" step="1" autocomplete="off">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Placement Angle</span><span id="placementAngleDisplay">0°</span></div>
+                    <input type="range" id="placementAngleInput" value="0" min="-90" max="90" step="1" autocomplete="off">
+                </div>
             </div>
+
+            <div class="config-section">
+                <span class="config-section-label">Simulation</span>
+                <label>Resolution    <input type="number" id="resolutionInput" value="32"  min="4" step="1"></label>
+                <label>Tau           <input type="number" id="tauInput"        value="0.6" step="0.01" min="0.51" max="2.0"></label>
+                <label>Warmup Steps  <input type="number" id="warmupInput"     value="0"   min="0" step="100"></label>
+            </div>
+
+            <div class="config-section">
+                <span class="config-section-label">Visualization</span>
+                <label>Display Scale <input type="number" id="displayScaleInput" value="0.05" step="0.01" min="0.001"></label>
+            </div>
+
+            <button id="startSimButton" class="toggle-button">Start Simulation</button>
+            <div id="console"></div>
         </div>
         <div id="canvas-container"></div>
     </div>

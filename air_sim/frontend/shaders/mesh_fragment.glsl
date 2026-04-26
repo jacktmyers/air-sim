@@ -2,8 +2,8 @@ precision mediump float;
 
 uniform vec3 uLightDirection;
 
-varying vec3 vColor;
-varying vec3 vNormal;
+in vec3 vColor;
+in vec3 vNormal;
 
 void main() {
     vec3 normal = normalize(vNormal);

@@ -1,8 +1,11 @@
-cmake_minimum_required(VERSION 3.15)
-project(air_sim)
+cmake_minimum_required(VERSION 3.18)
+project(air_sim LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 
 # Conda env packages
 find_package(Boost REQUIRED COMPONENTS system)
@@ -19,7 +22,8 @@ if(NOT EXISTS ${CROW_INCLUDE_DIR})
     message(FATAL_ERROR "Crow headers not found at ${CROW_INCLUDE_DIR}")
 endif()
 
-add_executable(air_sim main.cpp)
+add_executable(air_sim main.cpp lbm_solver.cu)
+set_property(TARGET air_sim PROPERTY CUDA_ARCHITECTURES native)
 
 target_compile_definitions(air_sim PRIVATE
     DATA_DIR="${CMAKE_SOURCE_DIR}/data"

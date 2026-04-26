@@ -5,6 +5,7 @@
 #include <queue>
 #include <unordered_map>
 #include <cmath>
+#include <glm/glm.hpp>
 
 struct Mesh {
     std::vector<float> vertices;
@@ -45,6 +46,7 @@ struct Mesh {
         return {cx/len, cy/len, cz/len};
     }
 
+    // BFS (Not used anymore)
     std::array<float, 3> bfs_average_normal(uint32_t start_face, int n) const {
         uint32_t face_count = faces.size() / 3;
         if (start_face >= face_count) return {0.f, 0.f, 0.f};
@@ -77,5 +79,32 @@ struct Mesh {
         float len = std::sqrt(nx*nx + ny*ny + nz*nz);
         if (len == 0.f) return {0.f, 0.f, 0.f};
         return {nx/len, ny/len, nz/len};
+    }
+
+    void align_horizontal() {
+        size_t n = vertices.size() / 3;
+
+        glm::vec2 mean(0.0f);
+        for (size_t i = 0; i < n; i++)
+            mean += glm::vec2(vertices[i*3], vertices[i*3+1]);
+        mean /= static_cast<float>(n);
+
+        float cxx = 0, cxy = 0, cyy = 0;
+        for (size_t i = 0; i < n; i++) {
+            glm::vec2 d(vertices[i*3] - mean.x, vertices[i*3+1] - mean.y);
+            cxx += d.x * d.x;
+            cxy += d.x * d.y;
+            cyy += d.y * d.y;
+        }
+
+        float theta = 0.5f * glm::atan(2.0f * cxy, cxx - cyy);
+        float c = glm::cos(theta), s = glm::sin(theta);
+        glm::mat2 rot(c, -s, s, c);
+
+        for (size_t i = 0; i < n; i++) {
+            glm::vec2 vr = rot * glm::vec2(vertices[i*3] - mean.x, vertices[i*3+1] - mean.y) + mean;
+            vertices[i*3]   = vr.x;
+            vertices[i*3+1] = vr.y;
+        }
     }
 };

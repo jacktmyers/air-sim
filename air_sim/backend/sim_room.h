@@ -61,6 +61,7 @@ std::vector<SimRoom> load_in_rooms(const std::filesystem::path& data_dir) {
         }
 
         mesh.build_adjacency();
+        mesh.align_horizontal();
 
         SimRoom room;
         room.name = entry.path().filename().string();

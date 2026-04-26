@@ -1,7 +1,7 @@
 attribute vec3 color;
 
-varying vec3 vColor;
-varying vec3 vNormal;
+out vec3 vColor;
+out vec3 vNormal;
 
 void main() {
     vColor = color;
