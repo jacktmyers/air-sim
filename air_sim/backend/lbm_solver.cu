@@ -306,9 +306,9 @@ void LBMSolver::mark_ac_voxels(const ACUnitData& ac) {
     emitter_vy_ = ac.out_vel.y * SPEED_SCALE;
     emitter_vz_ = ac.out_vel.z * SPEED_SCALE;
 
-    // intake_vx_ = ac.in_vel.x * SPEED_SCALE;
-    // intake_vy_ = ac.in_vel.y * SPEED_SCALE;
-    // intake_vz_ = ac.in_vel.z * SPEED_SCALE;
+    intake_vx_ = ac.in_vel.x * SPEED_SCALE;
+    intake_vy_ = ac.in_vel.y * SPEED_SCALE;
+    intake_vz_ = ac.in_vel.z * SPEED_SCALE;
 
     // Find nearest fluid voxel to ac position
     auto find_nearest_fluid = [&](float wx, float wy, float wz, int& gx, int& gy, int& gz) {
@@ -341,10 +341,11 @@ void LBMSolver::mark_ac_voxels(const ACUnitData& ac) {
     };
 
     find_nearest_fluid(ac.placement.x, ac.placement.y, ac.placement.z, emit_x_, emit_y_, emit_z_);
-    // find_nearest_fluid(ac.placement.x, ac.placement.y, ac.placement.z, intake_x_, intake_y_, intake_z_);
+    find_nearest_fluid(ac.placement.x, ac.placement.y, ac.placement.z + voxel_size_, intake_x_, intake_y_, intake_z_);
 
     h_cell_type_[cell_idx(emit_x_, emit_y_, emit_z_)] = CellType::Emitter;
-    // h_cell_type_[cell_idx(intake_x_, intake_y_, intake_z_)] = CellType::Intake;
+    if (!(intake_x_ == emit_x_ && intake_y_ == emit_y_ && intake_z_ == emit_z_))
+        h_cell_type_[cell_idx(intake_x_, intake_y_, intake_z_)] = CellType::Intake;
 }
 
 // Allocates memory for GPU
@@ -511,7 +512,8 @@ void LBMSolver::apply_boundary_conditions_cpu() {
     };
 
     reset_to_equil(emit_x_, emit_y_, emit_z_, emitter_vx_, emitter_vy_, emitter_vz_);
-    // reset_to_equil(intake_x_, intake_y_, intake_z_, intake_vx_, intake_vy_, intake_vz_);
+    if (!(intake_x_ == emit_x_ && intake_y_ == emit_y_ && intake_z_ == emit_z_))
+        reset_to_equil(intake_x_, intake_y_, intake_z_, intake_vx_, intake_vy_, intake_vz_);
 }
 
 

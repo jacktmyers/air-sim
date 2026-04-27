@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import pathlib
 
@@ -34,6 +35,13 @@ for env_path in envs:
         }
     })
 
-out = pathlib.Path("C:/Users/Jack/.cmake-conda-kits.json")
+out = pathlib.Path.home() / ".cmake-conda-kits.json"
 out.write_text(json.dumps(kits, indent=2))
 print(f"Wrote {len(kits)} kits to {out}")
+
+settings_path = pathlib.Path(os.environ["APPDATA"]) / "Code/User/settings.json"
+settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
+settings["cmake.generator"] = "Ninja"
+settings_path.parent.mkdir(parents=True, exist_ok=True)
+settings_path.write_text(json.dumps(settings, indent=2))
+print(f"Set cmake.generator=Ninja in {settings_path}")

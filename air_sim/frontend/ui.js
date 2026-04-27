@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { acGroup, renderState, initGrid, clearGrid, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale } from './render.js';
+import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale } from './render.js';
 import { simConfig, simState } from './simulation.js';
 import { sendConfig, startSim, stopSim, onSimStopped } from './connection.js';
 
@@ -43,7 +43,7 @@ moveACButton.onclick = () => {
 const startSimButton = document.querySelector('#startSimButton');
 startSimButton.onclick = async () => {
     consoleMessage('');
-    if (!acGroup.visible) {
+    if (!acGroup.visible && !acVisibleBeforeGrid) {
         consoleMessage('Place the AC unit before starting the simulation');
         return;
     }
@@ -69,11 +69,21 @@ onSimStopped(() => {
 
 const showGridButton = document.querySelector('#showGridButton');
 let gridVisible = false;
+let acVisibleBeforeGrid = false;
 showGridButton.onclick = () => {
     gridVisible = !gridVisible;
     showGridButton.classList.toggle('clicked', gridVisible);
-    if (gridVisible) initGrid(simConfig.sim_data.resolution);
-    else clearGrid();
+    if (gridVisible) {
+        initGrid(simConfig.sim_data.resolution);
+        acVisibleBeforeGrid = acGroup.visible;
+        if (acGroup.visible)
+            initACVoxels(acGroup.position, simConfig.sim_data.resolution);
+        acGroup.visible = false;
+    } else {
+        clearGrid();
+        clearACVoxels();
+        acGroup.visible = acVisibleBeforeGrid;
+    }
 };
 
 const inputBindings = [

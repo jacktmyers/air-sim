@@ -61,12 +61,12 @@ const _up = new THREE.Vector3(0, 1, 0);
 let _baseQuat = new THREE.Quaternion();
 let _placementAngleRad = 0;
 let _outflowAngleRad = 0;
-let _inflowAngleRad = Math.PI / 4;
+let _inflowAngleRad = Math.PI/2;
 
 function _applyGroupQuat() {
     const groupRot   = new THREE.Quaternion().setFromAxisAngle(_up, _placementAngleRad);
-    const outflowRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), _outflowAngleRad * -1);
-    const inflowRot  = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), _inflowAngleRad);
+    const outflowRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), _outflowAngleRad);
+    const inflowRot  = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), _inflowAngleRad * -1);
     acGroup.quaternion.multiplyQuaternions(groupRot, _baseQuat);
     outflowPivot.quaternion.copy(outflowRot);
     inflowPivot.quaternion.copy(inflowRot);
@@ -270,6 +270,58 @@ export function clearGrid() {
     renderState.grid.geometry.dispose();
     renderState.grid.material.dispose();
     renderState.grid = null;
+}
+
+let _emitVoxel = null, _intakeVoxel = null;
+const _emitVoxelMat   = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.6 });
+const _intakeVoxelMat = new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.6 });
+
+export function initACVoxels(worldPos, resolution) {
+    clearACVoxels();
+    if (!renderState.mesh) return;
+
+    const pos = renderState.mesh.geometry.attributes.position.array;
+    let min_x = Infinity, min_y = Infinity, min_z = Infinity;
+    let max_x = -Infinity, max_y = -Infinity, max_z = -Infinity;
+    for (let i = 0; i < pos.length; i += 3) {
+        if (pos[i]   < min_x) min_x = pos[i];   if (pos[i]   > max_x) max_x = pos[i];
+        if (pos[i+1] < min_y) min_y = pos[i+1]; if (pos[i+1] > max_y) max_y = pos[i+1];
+        if (pos[i+2] < min_z) min_z = pos[i+2]; if (pos[i+2] > max_z) max_z = pos[i+2];
+    }
+    const voxelSize = Math.max(max_x-min_x, max_y-min_y, max_z-min_z) / resolution;
+
+    const ply_x = worldPos.x;
+    const ply_y = -worldPos.z;
+    const ply_z = worldPos.y;
+    const ix = Math.floor((ply_x - min_x) / voxelSize);
+    const iy = Math.floor((ply_y - min_y) / voxelSize);
+    const iz = Math.floor((ply_z - min_z) / voxelSize);
+
+    const emit_px = min_x + (ix + 0.5) * voxelSize;
+    const emit_py = min_y + (iy + 0.5) * voxelSize;
+    const emit_pz = min_z + (iz + 0.5) * voxelSize;
+    const intake_pz = emit_pz + voxelSize;
+
+    const geom = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
+    _emitVoxel = new THREE.Mesh(geom, _emitVoxelMat);
+    _emitVoxel.position.set(emit_px, emit_pz, -emit_py);
+    scene.add(_emitVoxel);
+
+    _intakeVoxel = new THREE.Mesh(geom, _intakeVoxelMat);
+    _intakeVoxel.position.set(emit_px, intake_pz, -emit_py);
+    scene.add(_intakeVoxel);
+}
+
+export function clearACVoxels() {
+    if (_emitVoxel) {
+        scene.remove(_emitVoxel);
+        _emitVoxel.geometry.dispose();
+        _emitVoxel = null;
+    }
+    if (_intakeVoxel) {
+        scene.remove(_intakeVoxel);
+        _intakeVoxel = null;
+    }
 }
 
 window.addEventListener('resize', () => {
