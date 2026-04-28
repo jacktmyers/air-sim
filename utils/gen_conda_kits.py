@@ -20,7 +20,6 @@ for env_path in envs:
     name = "base" if p == base_path else p.name
     kits.append({
         "name": f"conda: {name} (VS 2022 x64)",
-        "visualStudio": "974d765e",
         "visualStudioArchitecture": "x64",
         "isTrusted": True,
         "preferredGenerator": {
