@@ -31,7 +31,7 @@ for env_path in envs:
         "environmentVariables": {
             "CONDA_PREFIX": str(p),
             "CONDA_DEFAULT_ENV": name,
-            "PATH": f"{p};{p}/Scripts;{p}/Library/bin;{p}/Library/mingw-w64/bin;${{env:PATH}}"
+            "PATH": f"{p};{p}/Scripts;{p}/Library/bin;${{env:PATH}}"
         }
     })
 
@@ -39,8 +39,16 @@ out = pathlib.Path.home() / ".cmake-conda-kits.json"
 out.write_text(json.dumps(kits, indent=2))
 print(f"Wrote {len(kits)} kits to {out}")
 
+import re
+
+def load_jsonc(path):
+    raw = path.read_text(encoding="utf-8") if path.exists() else "{}"
+    raw = re.sub(r'//[^\n]*', '', raw)
+    raw = re.sub(r',\s*([}\]])', r'\1', raw)
+    return json.loads(raw)
+
 settings_path = pathlib.Path(os.environ["APPDATA"]) / "Code/User/settings.json"
-settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
+settings = load_jsonc(settings_path)
 settings["cmake.generator"] = "Ninja"
 settings_path.parent.mkdir(parents=True, exist_ok=True)
 settings_path.write_text(json.dumps(settings, indent=2))
