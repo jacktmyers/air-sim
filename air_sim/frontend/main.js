@@ -1,6 +1,6 @@
 import { renderer, scene, camera, controls, updateWalkthrough, walkthroughMode, shaderMaterials } from './render.js';
 import { simState } from './simulation.js';
-import { updateSimPoints, sortSplats, updateSimArrows } from './render.js';
+import { updateSimPoints, sortSplats, updateStreamlines, updateVolumeRaymarching } from './render.js';
 import { connectMeshWebSocket, connectSplatWebSocket } from './connection.js';
 import './ui.js';
 
@@ -10,7 +10,8 @@ function animate() {
     if (!walkthroughMode) controls.update();
     updateWalkthrough();
     updateSimPoints(simState.frameData);
-    updateSimArrows(simState.positions, simState.frameData);
+    updateStreamlines(simState.positions, simState.frameData);
+    updateVolumeRaymarching(simState.frameData);
     sortSplats();
     for(const mat of shaderMaterials) {
         if(mat.uniforms.uCameraPos)

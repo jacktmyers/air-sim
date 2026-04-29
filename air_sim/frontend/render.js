@@ -31,6 +31,7 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 export const raycaster = new THREE.Raycaster();
 export const pointer = new THREE.Vector2();
 
+<<<<<<< HEAD
 export const fpControls = new PointerLockControls(camera, renderer.domElement);
 
 export const moveState = { f: false, b: false, l: false, r: false };
@@ -107,6 +108,8 @@ export function updateWalkthrough() {
 //     new THREE.MeshBasicMaterial({ color: 0xff0000 })
 // );
 
+=======
+>>>>>>> abhinav-first
 export const dot = new THREE.Group();
 
 export const fbxLoader = new FBXLoader();
@@ -252,15 +255,32 @@ export const renderState = {
     mesh: null,
     simPoints: null,
     simSpeedBuffer: null,
-    simArrows: null,
-    simArrowVelocityBuffer: null,
+    streamlines: null,
+    streamlinePositionBuffer: null,
+    volumePoints: null,
+    volumeDensityBuffer: null,
+    volumeSpeedBuffer: null,
+    volumeRaymarchMesh: null,
+    volumeTexture: null,
+    volumeRaymarchShaderSources: null,
+    volumeGridInfo: null,
     meshShaderSources: null,
     simShaderSources: null,
     splatShaderSources: null,
     acShaderSources: null,
+<<<<<<< HEAD
     grid: null,
     splats: null,
     splatViewport: null,
+=======
+    grid: null
+};
+
+export const vizFlags = {
+    streamlines: false,
+    volume: false,
+    simPoints: true
+>>>>>>> abhinav-first
 };
 
 export function worldToPly(v) { return [v.x, -v.z, v.y]; }
@@ -282,6 +302,17 @@ async function loadACShaderSources() {
     }
 
     return renderState.acShaderSources;
+}
+
+async function loadVolumeRaymarchShaderSources() {
+    if (!renderState.volumeRaymarchShaderSources) {
+        renderState.volumeRaymarchShaderSources = await loadShaderSources(
+            "shaders/volume_raymarch_vertex.glsl",
+            "shaders/volume_raymarch_fragment.glsl"
+        );
+    }
+
+    return renderState.volumeRaymarchShaderSources;
 }
 
 export function initShaderMaterial({ vertexShader, fragmentShader }, uniforms) {
@@ -320,141 +351,315 @@ export function initMesh(vertices, colors, faces) {
     controls.target.y = midY;
 }
 
-// export function initSimPoints(positions) {
-//     clearSimPoints();
-//     const count = positions.length / 3;
-//     renderState.simSpeedBuffer = new Float32Array(count);
-//     const geometry = new THREE.BufferGeometry();
-//     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-//     geometry.setAttribute('speed', new THREE.BufferAttribute(renderState.simSpeedBuffer, 1));
-//     const material = new THREE.ShaderMaterial({
-//         vertexShader: renderState.simShaderSources.vertexShader,
-//         fragmentShader: renderState.simShaderSources.fragmentShader,
-//         uniforms: { uMaxSpeed: { value: _displayScale } },
-//         transparent: true,
-//         depthWrite: false,
-//     });
-//     renderState.simPoints = new THREE.Points(geometry, material);
-//     renderState.simPoints.rotation.x = -Math.PI / 2;
-//     scene.add(renderState.simPoints);
-// }
+let _streamlineSeedEvery = 80;
+let _streamlineSteps = 20;
+let _streamlineStepSize = 0.06;
+let _streamlineMinSpeed = 0.00001;
 
-let _arrowEvery = 4;
-let _arrowScale = 3.0;
-let _arrowMaxSpeed = 0.05;
+function nearestVelocityAt(pos, positions, frameData) {
+    let bestIndex = -1;
+    let bestDistSq = Infinity;
 
-function createArrowGeometry() {
-    const shaft = new THREE.CylinderGeometry(
-        0.012,
-        0.012,
-        0.16,
-        8,
-        1,
-        false
-    );
+    const cellCount = positions.length / 3;
 
-    const head = new THREE.ConeGeometry(
-        0.04,
-        0.10,
-        16,
-        1,
-        true   // IMPORTANT: openEnded = true, removes closed polygon cap
-    );
+    for (let i = 0; i < cellCount; i++) {
+        const p = i * 3;
 
-    // Geometry points along +Y.
-    shaft.translate(0, 0.08, 0);
-    head.translate(0, 0.21, 0);
+        const dx = positions[p + 0] - pos.x;
+        const dy = positions[p + 1] - pos.y;
+        const dz = positions[p + 2] - pos.z;
 
-    return mergeGeometries([shaft, head], false);
+        const d2 = dx * dx + dy * dy + dz * dz;
+
+        if (d2 < bestDistSq) {
+            bestDistSq = d2;
+            bestIndex = i;
+        }
+    }
+
+    if (bestIndex < 0) {
+        return null;
+    }
+
+    const f = bestIndex * 5;
+
+    return {
+        vx: frameData[f + 0],
+        vy: frameData[f + 1],
+        vz: frameData[f + 2],
+        speed: frameData[f + 3],
+        density: frameData[f + 4]
+    };
 }
 
-export function initSimArrows(positions) {
-    clearSimArrows();
+export function initStreamlines(positions) {
+    clearStreamlines();
 
-    const arrowGeom = createArrowGeometry();
+    const cellCount = positions.length / 3;
+    const seedCount = Math.floor(cellCount / _streamlineSeedEvery);
+    const pointsPerLine = _streamlineSteps;
+    const totalPoints = seedCount * pointsPerLine;
 
-    const arrowMat = new THREE.MeshBasicMaterial({
-        color: 0x00aaff,
+    renderState.streamlinePositionBuffer = new Float32Array(totalPoints * 3);
+
+    const geometry = new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(renderState.streamlinePositionBuffer, 3)
+    );
+
+    const material = new THREE.LineBasicMaterial({
+        color: 0x00ccff,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.75,
         depthWrite: false
     });
 
-    const cellCount = positions.length / 3;
-    const arrowCount = Math.ceil(cellCount / _arrowEvery);
+    const lines = new THREE.LineSegments(geometry, material);
 
-    renderState.simArrows = new THREE.InstancedMesh(
-        arrowGeom,
-        arrowMat,
-        arrowCount
-    );
+    lines.rotation.x = -Math.PI / 2;
 
-    renderState.simArrows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-
-    // Same coordinate transform as sim points
-    renderState.simArrows.rotation.x = -Math.PI / 2;
-
-    scene.add(renderState.simArrows);
+    renderState.streamlines = lines;
+    scene.add(renderState.streamlines);
 }
 
-const _arrowDummy = new THREE.Object3D();
-const _arrowDir = new THREE.Vector3();
-const _arrowBaseDir = new THREE.Vector3(0, 1, 0); // arrow geometry points +Y
-const _arrowQuat = new THREE.Quaternion();
+export function updateStreamlines(positions, frameData) {
+    if (
+        !renderState.streamlines ||
+        !renderState.streamlinePositionBuffer ||
+        !positions ||
+        !frameData
+    ) {
+        return;
+    }
 
-export function updateSimArrows(positions, frameData) {
-    if (!renderState.simArrows || !positions || !frameData) return;
+    const buffer = renderState.streamlinePositionBuffer;
 
-    let instanceIndex = 0;
+    let write = 0;
     const cellCount = positions.length / 3;
 
-    for (let i = 0; i < cellCount; i += _arrowEvery) {
+    for (let i = 0; i < cellCount; i += _streamlineSeedEvery) {
         const p = i * 3;
-        const f = i * 5;
 
-        const vx = frameData[f + 0];
-        const vy = frameData[f + 1];
-        const vz = frameData[f + 2];
-        const speed = frameData[f + 3];
-
-        _arrowDummy.position.set(
+        const pos = new THREE.Vector3(
             positions[p + 0],
             positions[p + 1],
             positions[p + 2]
         );
 
-        if (speed < 0.00001) {
-            _arrowDummy.scale.set(0, 0, 0);
-        } else {
-            _arrowDir.set(vx, vy, vz).normalize();
-            _arrowQuat.setFromUnitVectors(_arrowBaseDir, _arrowDir);
+        for (let s = 0; s < _streamlineSteps; s++) {
+            const vel = nearestVelocityAt(pos, positions, frameData);
 
-            _arrowDummy.quaternion.copy(_arrowQuat);
+            if (!vel || vel.speed < _streamlineMinSpeed) {
+                buffer[write++] = pos.x;
+                buffer[write++] = pos.y;
+                buffer[write++] = pos.z;
+                continue;
+            }
 
-            const len = Math.min(speed / _arrowMaxSpeed, 1.0) * _arrowScale;
+            buffer[write++] = pos.x;
+            buffer[write++] = pos.y;
+            buffer[write++] = pos.z;
 
-            // Geometry points along Y, so stretch Y
-            _arrowDummy.scale.set(1.0, len, 1.0);
+            const dir = new THREE.Vector3(
+                vel.vx,
+                vel.vy,
+                vel.vz
+            ).normalize();
+
+            pos.addScaledVector(dir, _streamlineStepSize);
         }
-
-        _arrowDummy.updateMatrix();
-        renderState.simArrows.setMatrixAt(instanceIndex, _arrowDummy.matrix);
-
-        instanceIndex++;
     }
 
-    renderState.simArrows.instanceMatrix.needsUpdate = true;
+    renderState.streamlines.geometry.attributes.position.needsUpdate = true;
 }
 
-export function clearSimArrows() {
-    if (!renderState.simArrows) return;
+export function clearStreamlines() {
+    if (!renderState.streamlines) return;
 
-    scene.remove(renderState.simArrows);
+    scene.remove(renderState.streamlines);
 
-    renderState.simArrows.geometry.dispose();
-    renderState.simArrows.material.dispose();
+    renderState.streamlines.geometry.dispose();
+    renderState.streamlines.material.dispose();
 
-    renderState.simArrows = null;
+    renderState.streamlines = null;
+    renderState.streamlinePositionBuffer = null;
+}
+
+function buildVolumeGridInfo(positions) {
+    const xs = [];
+    const ys = [];
+    const zs = [];
+
+    for (let i = 0; i < positions.length; i += 3) {
+        xs.push(positions[i + 0]);
+        ys.push(positions[i + 1]);
+        zs.push(positions[i + 2]);
+    }
+
+    const uniqueSorted = (arr) =>
+        Array.from(new Set(arr.map(v => v.toFixed(5))))
+            .map(Number)
+            .sort((a, b) => a - b);
+
+    const ux = uniqueSorted(xs);
+    const uy = uniqueSorted(ys);
+    const uz = uniqueSorted(zs);
+
+    const nx = ux.length;
+    const ny = uy.length;
+    const nz = uz.length;
+
+    const min = new THREE.Vector3(ux[0], uy[0], uz[0]);
+    const max = new THREE.Vector3(ux[nx - 1], uy[ny - 1], uz[nz - 1]);
+
+    const dx = nx > 1 ? ux[1] - ux[0] : 1.0;
+    const dy = ny > 1 ? uy[1] - uy[0] : 1.0;
+    const dz = nz > 1 ? uz[1] - uz[0] : 1.0;
+
+    min.sub(new THREE.Vector3(dx, dy, dz).multiplyScalar(0.5));
+    max.add(new THREE.Vector3(dx, dy, dz).multiplyScalar(0.5));
+
+    const xMap = new Map(ux.map((v, i) => [v.toFixed(5), i]));
+    const yMap = new Map(uy.map((v, i) => [v.toFixed(5), i]));
+    const zMap = new Map(uz.map((v, i) => [v.toFixed(5), i]));
+
+    const indexMap = new Int32Array(positions.length / 3);
+
+    for (let i = 0; i < positions.length / 3; i++) {
+        const p = i * 3;
+
+        const ix = xMap.get(positions[p + 0].toFixed(5));
+        const iy = yMap.get(positions[p + 1].toFixed(5));
+        const iz = zMap.get(positions[p + 2].toFixed(5));
+
+        indexMap[i] = ix + iy * nx + iz * nx * ny;
+    }
+
+    return {
+        nx,
+        ny,
+        nz,
+        min,
+        max,
+        indexMap,
+        data: new Float32Array(nx * ny * nz)
+    };
+}
+
+export async function initVolumeRaymarching(positions) {
+    clearVolumeRaymarching();
+
+    const shaderSources = await loadVolumeRaymarchShaderSources();
+
+    const grid = buildVolumeGridInfo(positions);
+    renderState.volumeGridInfo = grid;
+
+    const texture = new THREE.Data3DTexture(
+        grid.data,
+        grid.nx,
+        grid.ny,
+        grid.nz
+    );
+
+    texture.format = THREE.RedFormat;
+    texture.type = THREE.FloatType;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.unpackAlignment = 1;
+    texture.needsUpdate = true;
+
+    renderState.volumeTexture = texture;
+
+    const size = new THREE.Vector3().subVectors(grid.max, grid.min);
+    const center = new THREE.Vector3().addVectors(grid.min, grid.max).multiplyScalar(0.5);
+
+    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+    geometry.translate(center.x, center.y, center.z);
+
+    const material = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+
+        vertexShader: shaderSources.vertexShader,
+        fragmentShader: shaderSources.fragmentShader,
+
+        uniforms: {
+            uVolumeTex: { value: texture },
+            uBoxMin: { value: grid.min },
+            uBoxMax: { value: grid.max },
+            uCameraLocalPos: { value: new THREE.Vector3() },
+
+            uStepSize: { value: Math.min(size.x, size.y, size.z) / 192.0 },
+            uOpacity: { value: 0.12 },
+            uThreshold: { value: 0.02 }
+        },
+
+        transparent: true,
+        depthWrite: false,
+
+        depthTest: false,
+
+        side: THREE.BackSide
+    });
+
+    renderState.volumeRaymarchMesh = new THREE.Mesh(geometry, material);
+
+    renderState.volumeRaymarchMesh.rotation.x = -Math.PI / 2;
+
+    scene.add(renderState.volumeRaymarchMesh);
+}
+
+const _volumeLocalCamera = new THREE.Vector3();
+
+export function updateVolumeRaymarching(frameData) {
+    const mesh = renderState.volumeRaymarchMesh;
+    const texture = renderState.volumeTexture;
+    const grid = renderState.volumeGridInfo;
+
+    if (!mesh || !texture || !grid || !frameData) return;
+
+    grid.data.fill(0.0);
+
+    let maxSpeed = 0.00001;
+
+    for (let i = 0; i < grid.indexMap.length; i++) {
+        const speed = frameData[i * 5 + 3];
+        if (speed > maxSpeed) maxSpeed = speed;
+    }
+
+    for (let i = 0; i < grid.indexMap.length; i++) {
+        const speed = frameData[i * 5 + 3];
+        const texIndex = grid.indexMap[i];
+
+        grid.data[texIndex] = speed / maxSpeed;
+    }
+
+    texture.needsUpdate = true;
+
+    mesh.updateMatrixWorld(true);
+
+    _volumeLocalCamera.copy(camera.position);
+    mesh.worldToLocal(_volumeLocalCamera);
+
+    mesh.material.uniforms.uCameraLocalPos.value.copy(_volumeLocalCamera);
+}
+
+export function clearVolumeRaymarching() {
+    if (!renderState.volumeRaymarchMesh) return;
+
+    scene.remove(renderState.volumeRaymarchMesh);
+
+    renderState.volumeRaymarchMesh.geometry.dispose();
+    renderState.volumeRaymarchMesh.material.dispose();
+
+    if (renderState.volumeTexture) {
+        renderState.volumeTexture.dispose();
+    }
+
+    renderState.volumeRaymarchMesh = null;
+    renderState.volumeTexture = null;
+    renderState.volumeGridInfo = null;
 }
 
 export function initSimPoints(positions) {
@@ -494,7 +699,12 @@ export function initSimPoints(positions) {
 
     renderState.simPoints = new THREE.Points(geometry, material);
     renderState.simPoints.rotation.x = -Math.PI / 2;
+<<<<<<< HEAD
     renderState.simPoints.renderOrder = Infinity;
+=======
+    renderState.simPoints.visible = vizFlags.simPoints;
+
+>>>>>>> abhinav-first
     scene.add(renderState.simPoints);
 }
 
