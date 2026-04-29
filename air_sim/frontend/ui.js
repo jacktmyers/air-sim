@@ -1,9 +1,5 @@
 import * as THREE from 'three';
-<<<<<<< HEAD
 import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, fpControls, enterDollhouseMode, enterWalkthroughMode, walkthroughMode, setWalkSpeed, raycaster, pointer } from './render.js';
-=======
-import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, raycaster, pointer } from './render.js';
->>>>>>> backup
 
 import { simConfig, simState } from './simulation.js';
 import { sendConfig, startSim, stopSim, onSimStopped } from './connection.js';
@@ -205,7 +201,6 @@ showMeshToggle.addEventListener('change', () => {
     if (renderState.mesh) renderState.mesh.visible = showMeshToggle.checked;
 });
 
-<<<<<<< HEAD
 const walkthroughToggle = document.getElementById('walkthroughToggle');
 walkthroughToggle.onclick = () => {
     if (walkthroughMode) {
@@ -227,8 +222,6 @@ const walkSpeedInput = document.getElementById('walkSpeedInput');
 setWalkSpeed(parseFloat(walkSpeedInput.value));
 walkSpeedInput.addEventListener('input', e => setWalkSpeed(parseFloat(e.target.value)));
 
-=======
->>>>>>> backup
 const exportMatrixButton = document.getElementById('exportMatrixButton');
 exportMatrixButton.onclick = () => {
     const splatMatrix = new THREE.Matrix4();

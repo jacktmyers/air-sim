@@ -1,6 +1,6 @@
-import { renderer, scene, camera, controls, updateWalkthrough, walkthroughMode } from './render.js';
+import { renderer, scene, camera, controls, updateWalkthrough, walkthroughMode, shaderMaterials } from './render.js';
 import { simState } from './simulation.js';
-import { updateSimPoints, sortSplats } from './render.js';
+import { updateSimPoints, sortSplats, updateSimArrows } from './render.js';
 import { connectMeshWebSocket, connectSplatWebSocket } from './connection.js';
 import './ui.js';
 
@@ -8,12 +8,14 @@ import './ui.js';
 function animate() {
     requestAnimationFrame(animate);
     if (!walkthroughMode) controls.update();
-    updateSimPoints(simState.frameData);
-    sortSplats();
-<<<<<<< HEAD
     updateWalkthrough();
-=======
->>>>>>> backup
+    updateSimPoints(simState.frameData);
+    updateSimArrows(simState.positions, simState.frameData);
+    sortSplats();
+    for(const mat of shaderMaterials) {
+        if(mat.uniforms.uCameraPos)
+            mat.uniforms.uCameraPos.value.copy(camera.position);
+    }
     renderer.render(scene, camera);
 }
 
