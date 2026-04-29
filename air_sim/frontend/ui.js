@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, raycaster, pointer } from './render.js';
+import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, fpControls, enterDollhouseMode, enterWalkthroughMode, walkthroughMode, setWalkSpeed, raycaster, pointer } from './render.js';
 
 import { simConfig, simState } from './simulation.js';
 import { sendConfig, startSim, stopSim, onSimStopped } from './connection.js';
@@ -200,6 +200,27 @@ showSplatToggle.addEventListener('change', () => {
 showMeshToggle.addEventListener('change', () => {
     if (renderState.mesh) renderState.mesh.visible = showMeshToggle.checked;
 });
+
+const walkthroughToggle = document.getElementById('walkthroughToggle');
+walkthroughToggle.onclick = () => {
+    if (walkthroughMode) {
+        enterDollhouseMode();
+        walkthroughToggle.classList.remove('clicked');
+    } else {
+        enterWalkthroughMode();
+        walkthroughToggle.classList.add('clicked');
+        renderer.domElement.addEventListener('click', () => fpControls.lock(), { once: true });
+    }
+};
+fpControls.addEventListener('unlock', () => {
+    if (!walkthroughMode) return;
+    enterDollhouseMode();
+    walkthroughToggle.classList.remove('clicked');
+});
+
+const walkSpeedInput = document.getElementById('walkSpeedInput');
+setWalkSpeed(parseFloat(walkSpeedInput.value));
+walkSpeedInput.addEventListener('input', e => setWalkSpeed(parseFloat(e.target.value)));
 
 const exportMatrixButton = document.getElementById('exportMatrixButton');
 exportMatrixButton.onclick = () => {

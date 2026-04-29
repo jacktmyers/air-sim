@@ -59,6 +59,22 @@
             color: #888;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            cursor: pointer;
+            user-select: none;
+        }
+        .config-section-label::before {
+            content: '▾ ';
+        }
+        .config-section.collapsed .config-section-label::before {
+            content: '▸ ';
+        }
+        .config-section-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3em;
+        }
+        .config-section.collapsed .config-section-body {
+            display: none;
         }
         #sidebar label {
             display: flex;
@@ -92,66 +108,64 @@
 <body>
     <div id="app">
         <div id="sidebar">
+            <button id="walkthroughToggle" class="toggle-button">Walkthrough Mode</button>
+            <button id="startSimButton" class="toggle-button">Start Simulation</button>
             <button id="moveACButton" class="toggle-button">Move AC Unit</button>
-            <button id="showGridButton" class="toggle-button">Show Grid</button>
 
             <div class="config-section">
                 <span class="config-section-label">AC Unit</span>
-                <label>Outflow Velocity <input type="number" id="outVelInput" value="3.0" step="0.2" min="0.1" max="5"></label>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Outflow Angle</span><span id="outflowAngleDisplay">0°</span></div>
-                    <input type="range" id="outflowAngleInput" value="0" min="0" max="90" step="1" autocomplete="off">
-                </div>
-                <label>Intake Velocity <input type="number" id="inVelInput" value="3.0" step="0.2" min="0.1" max="5"></label>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Intake Angle</span><span id="intakeAngleDisplay">45°</span></div>
-                    <input type="range" id="intakeAngleInput" value="45" min="0" max="90" step="1" autocomplete="off">
-                </div>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Placement Angle</span><span id="placementAngleDisplay">0°</span></div>
-                    <input type="range" id="placementAngleInput" value="0" min="-90" max="90" step="1" autocomplete="off">
+                <div class="config-section-body">
+                    <label>Outflow Velocity <input type="number" id="outVelInput" value="3.0" step="0.2" min="0.1" max="5"></label>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Outflow Angle</span><span id="outflowAngleDisplay">0°</span></div>
+                        <input type="range" id="outflowAngleInput" value="0" min="0" max="90" step="1" autocomplete="off">
+                    </div>
+                    <label>Intake Velocity <input type="number" id="inVelInput" value="3.0" step="0.2" min="0.1" max="5"></label>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Intake Angle</span><span id="intakeAngleDisplay">45°</span></div>
+                        <input type="range" id="intakeAngleInput" value="45" min="0" max="90" step="1" autocomplete="off">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Placement Angle</span><span id="placementAngleDisplay">0°</span></div>
+                        <input type="range" id="placementAngleInput" value="0" min="-90" max="90" step="1" autocomplete="off">
+                    </div>
                 </div>
             </div>
 
-            <div class="config-section">
-                <span class="config-section-label">Simulation</span>
-                <label>Resolution    <input type="number" id="resolutionInput" value="32"  min="4" step="1"></label>
-                <label>Tau           <input type="number" id="tauInput"        value="0.55" step="0.01" min="0.51" max="1.5"></label>
-                <label>Warmup Steps  <input type="number" id="warmupInput"     value="0"   min="0" step="100"></label>
-            </div>
-
-            <div class="config-section">
-                <span class="config-section-label">Visualization</span>
-                <label>Display Velocity Scale <input type="number" id="displayScaleInput" value="0.01" step="0.01" min="0.001"></label>
-            </div>
-
-            <div class="config-section">
+            <div class="config-section collapsed">
                 <span class="config-section-label">Debug</span>
-                <label>Show Splat <input type="checkbox" id="showSplatToggle" checked></label>
-                <label>Show Mesh  <input type="checkbox" id="showMeshToggle" checked></label>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Splat Rot X</span><span id="splatRotXDisplay">0°</span></div>
-                    <input type="range" id="splatRotXInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                <div class="config-section-body">
+                    <button id="showGridButton" class="toggle-button">Show Grid</button>
+                    <label>Resolution    <input type="number" id="resolutionInput" value="32"  min="4" step="1"></label>
+                    <label>Tau           <input type="number" id="tauInput"        value="0.55" step="0.01" min="0.51" max="1.5"></label>
+                    <label>Warmup Steps  <input type="number" id="warmupInput"     value="0"   min="0" step="100"></label>
+                    <label>Display Velocity Scale <input type="number" id="displayScaleInput" value="0.001" step="0.01" min="0.001"></label>
+                    <label>Walk Speed <input type="number" id="walkSpeedInput" value="0.007" step="0.001" min="0.00001"></label>
+                    <label>Show Splat <input type="checkbox" id="showSplatToggle" checked></label>
+                    <label>Show Mesh  <input type="checkbox" id="showMeshToggle" checked></label>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Splat Rot X</span><span id="splatRotXDisplay">0°</span></div>
+                        <input type="range" id="splatRotXInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Splat Rot Y</span><span id="splatRotYDisplay">0°</span></div>
+                        <input type="range" id="splatRotYInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Splat Rot Z</span><span id="splatRotZDisplay">0°</span></div>
+                        <input type="range" id="splatRotZInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-row-header"><span>Splat Scale</span><span id="splatScaleDisplay">1.0</span></div>
+                        <input type="range" id="splatScaleInput" value="1.0" min="0.01" max="5" step="0.01" autocomplete="off">
+                    </div>
+                    <label>Splat Trans X <input type="number" id="splatTransXInput" value="0.0" step="0.05" autocomplete="off"></label>
+                    <label>Splat Trans Y <input type="number" id="splatTransYInput" value="0.0" step="0.05" autocomplete="off"></label>
+                    <label>Splat Trans Z <input type="number" id="splatTransZInput" value="0.0" step="0.05" autocomplete="off"></label>
+                    <button id="exportMatrixButton" class="toggle-button">Export Splat Matrix</button>
                 </div>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Splat Rot Y</span><span id="splatRotYDisplay">0°</span></div>
-                    <input type="range" id="splatRotYInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
-                </div>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Splat Rot Z</span><span id="splatRotZDisplay">0°</span></div>
-                    <input type="range" id="splatRotZInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
-                </div>
-                <div class="slider-row">
-                    <div class="slider-row-header"><span>Splat Scale</span><span id="splatScaleDisplay">1.0</span></div>
-                    <input type="range" id="splatScaleInput" value="1.0" min="0.01" max="5" step="0.01" autocomplete="off">
-                </div>
-                <label>Splat Trans X <input type="number" id="splatTransXInput" value="0.0" step="0.05" autocomplete="off"></label>
-                <label>Splat Trans Y <input type="number" id="splatTransYInput" value="0.0" step="0.05" autocomplete="off"></label>
-                <label>Splat Trans Z <input type="number" id="splatTransZInput" value="0.0" step="0.05" autocomplete="off"></label>
             </div>
 
-            <button id="exportMatrixButton" class="toggle-button">Export Splat Matrix</button>
-            <button id="startSimButton" class="toggle-button">Start Simulation</button>
             <div id="console"></div>
         </div>
         <div id="canvas-container"></div>
@@ -163,6 +177,11 @@
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
         }
     }
+    </script>
+    <script>
+        document.querySelectorAll('.config-section-label').forEach(label => {
+            label.addEventListener('click', () => label.closest('.config-section').classList.toggle('collapsed'));
+        });
     </script>
     <script type="module" src="main.js"></script>
 </body>

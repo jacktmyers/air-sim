@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
@@ -27,6 +28,77 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
 export const raycaster = new THREE.Raycaster();
 export const pointer = new THREE.Vector2();
+
+export const fpControls = new PointerLockControls(camera, renderer.domElement);
+
+export const moveState = { f: false, b: false, l: false, r: false };
+document.addEventListener('keydown', e => {
+    if (e.code === 'KeyW') moveState.f = true;
+    if (e.code === 'KeyS') moveState.b = true;
+    if (e.code === 'KeyA') moveState.l = true;
+    if (e.code === 'KeyD') moveState.r = true;
+});
+document.addEventListener('keyup', e => {
+    if (e.code === 'KeyW') moveState.f = false;
+    if (e.code === 'KeyS') moveState.b = false;
+    if (e.code === 'KeyA') moveState.l = false;
+    if (e.code === 'KeyD') moveState.r = false;
+});
+
+export let walkthroughMode = false;
+export let walkSpeed = 0.05;
+export function setWalkSpeed(v) { walkSpeed = v; }
+
+function getMeshBounds() {
+    const pos = renderState.mesh.geometry.attributes.position.array;
+    let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+    let cx=0,cy=0,cz=0;
+    const n = pos.length / 3;
+    for (let i=0;i<pos.length;i+=3){
+        cx+=pos[i]; cy+=pos[i+1]; cz+=pos[i+2];
+        if(pos[i]<minX)minX=pos[i]; if(pos[i]>maxX)maxX=pos[i];
+        if(pos[i+1]<minY)minY=pos[i+1]; if(pos[i+1]>maxY)maxY=pos[i+1];
+        if(pos[i+2]<minZ)minZ=pos[i+2]; if(pos[i+2]>maxZ)maxZ=pos[i+2];
+    }
+    return {
+        centroid: new THREE.Vector3(cx/n, cy/n, cz/n).applyMatrix4(renderState.mesh.matrixWorld),
+        span: Math.max(maxX-minX, maxY-minY, maxZ-minZ),
+    };
+}
+
+export function enterDollhouseMode() {
+    walkthroughMode = false;
+    fpControls.unlock();
+    controls.enabled = true;
+    if (renderState.mesh) {
+        const { centroid, span } = getMeshBounds();
+        renderState.mesh.visible = true;
+        controls.target.copy(centroid);
+        camera.position.set(centroid.x, centroid.y + span * 0.5, centroid.z + span);
+        controls.update();
+    }
+    if (renderState.splats) renderState.splats.visible = false;
+}
+
+export function enterWalkthroughMode() {
+    walkthroughMode = true;
+    controls.enabled = false;
+    if (renderState.mesh) {
+        const { centroid } = getMeshBounds();
+        camera.position.copy(centroid);
+        camera.lookAt(centroid.x + 1, centroid.y, centroid.z);
+    }
+    if (renderState.mesh)   renderState.mesh.visible   = false;
+    if (renderState.splats) renderState.splats.visible = true;
+}
+
+export function updateWalkthrough() {
+    if (!walkthroughMode || !fpControls.isLocked) return;
+    if (moveState.f) fpControls.moveForward(walkSpeed);
+    if (moveState.b) fpControls.moveForward(-walkSpeed);
+    if (moveState.l) fpControls.moveRight(-walkSpeed);
+    if (moveState.r) fpControls.moveRight(walkSpeed);
+}
 
 export const dot = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 16, 16),
@@ -182,9 +254,11 @@ export function initSimPoints(positions) {
         uniforms: { uMaxSpeed: { value: _displayScale } },
         transparent: true,
         depthWrite: false,
+        depthTest: false,
     });
     renderState.simPoints = new THREE.Points(geometry, material);
     renderState.simPoints.rotation.x = -Math.PI / 2;
+    renderState.simPoints.renderOrder = Infinity;
     scene.add(renderState.simPoints);
 }
 
@@ -412,6 +486,7 @@ export function initSplats(positions, colors, opacities, scales, rotations) {
 
     renderState.splats = new THREE.Mesh(geometry, material);
     renderState.splats.rotation.x = -Math.PI / 2;
+    renderState.splats.visible = walkthroughMode;
     renderState.splatViewport = vp;
     scene.add(renderState.splats);
     console.log(`Splats loaded: ${count}`);
