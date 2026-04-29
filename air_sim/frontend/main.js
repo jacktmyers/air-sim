@@ -10,7 +10,10 @@ function animate() {
     if (!walkthroughMode) controls.update();
     updateSimPoints(simState.frameData);
     sortSplats();
+<<<<<<< HEAD
     updateWalkthrough();
+=======
+>>>>>>> backup
     renderer.render(scene, camera);
 }
 

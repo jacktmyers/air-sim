@@ -486,7 +486,10 @@ export function initSplats(positions, colors, opacities, scales, rotations) {
 
     renderState.splats = new THREE.Mesh(geometry, material);
     renderState.splats.rotation.x = -Math.PI / 2;
+<<<<<<< HEAD
     renderState.splats.visible = walkthroughMode;
+=======
+>>>>>>> backup
     renderState.splatViewport = vp;
     scene.add(renderState.splats);
     console.log(`Splats loaded: ${count}`);

@@ -12,3 +12,4 @@ cmake_install.cmake
 *.user
 .claude/
 .vscode/
+air_sim\backend\data\lab\*.ply
