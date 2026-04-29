@@ -31,7 +31,6 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 export const raycaster = new THREE.Raycaster();
 export const pointer = new THREE.Vector2();
 
-<<<<<<< HEAD
 export const fpControls = new PointerLockControls(camera, renderer.domElement);
 
 export const moveState = { f: false, b: false, l: false, r: false };
@@ -108,8 +107,6 @@ export function updateWalkthrough() {
 //     new THREE.MeshBasicMaterial({ color: 0xff0000 })
 // );
 
-=======
->>>>>>> abhinav-first
 export const dot = new THREE.Group();
 
 export const fbxLoader = new FBXLoader();
@@ -268,11 +265,9 @@ export const renderState = {
     simShaderSources: null,
     splatShaderSources: null,
     acShaderSources: null,
-<<<<<<< HEAD
     grid: null,
     splats: null,
     splatViewport: null,
-=======
     grid: null
 };
 
@@ -280,7 +275,6 @@ export const vizFlags = {
     streamlines: false,
     volume: false,
     simPoints: true
->>>>>>> abhinav-first
 };
 
 export function worldToPly(v) { return [v.x, -v.z, v.y]; }
@@ -699,12 +693,9 @@ export function initSimPoints(positions) {
 
     renderState.simPoints = new THREE.Points(geometry, material);
     renderState.simPoints.rotation.x = -Math.PI / 2;
-<<<<<<< HEAD
     renderState.simPoints.renderOrder = Infinity;
-=======
     renderState.simPoints.visible = vizFlags.simPoints;
 
->>>>>>> abhinav-first
     scene.add(renderState.simPoints);
 }
 
