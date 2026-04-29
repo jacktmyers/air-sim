@@ -1,4 +1,4 @@
-import { renderState, loadShaderSources, initMesh, initSimPoints, clearSimPoints, updateSimPoints } from './render.js';
+import { renderState, loadShaderSources, initMesh, initSimPoints, clearSimPoints, updateSimPoints, initSplats } from './render.js';
 import { simConfig, simState } from './simulation.js';
 
 export const HOSTED_PORT = 42067;
@@ -79,6 +79,45 @@ export async function stopSim() {
     clearSimPoints();
     simState.running = false;
     return { ok: true };
+}
+
+export async function connectSplatWebSocket() {
+    try {
+        renderState.splatShaderSources = await loadShaderSources(
+            'shaders/splat_vertex.glsl', 'shaders/splat_fragment.glsl'
+        );
+    } catch (err) {
+        console.error('Failed to load splat shaders:', err);
+        return;
+    }
+
+    const ws = new WebSocket(`ws://localhost:${HOSTED_PORT}/splat`);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onmessage = (event) => {
+        const view  = new DataView(event.data);
+        const count = view.getUint32(0, true);
+        // 14 floats per splat: xyz(3) + rgb(3) + opacity(1) + scale(3) + rot(4)
+        const floats    = new Float32Array(event.data, 4, count * 14);
+        const positions = new Float32Array(count * 3);
+        const colors    = new Float32Array(count * 3);
+        const opacities = new Float32Array(count);
+        const scales    = new Float32Array(count * 3);
+        const rotations = new Float32Array(count * 4);
+        for (let i = 0; i < count; i++) {
+            const base = i * 14;
+            positions[i*3]   = floats[base];     positions[i*3+1] = floats[base+1]; positions[i*3+2] = floats[base+2];
+            colors[i*3]      = floats[base+3];   colors[i*3+1]    = floats[base+4]; colors[i*3+2]    = floats[base+5];
+            opacities[i]     = floats[base+6];
+            scales[i*3]      = floats[base+7];   scales[i*3+1]    = floats[base+8]; scales[i*3+2]    = floats[base+9];
+            rotations[i*4]   = floats[base+10];  rotations[i*4+1] = floats[base+11]; rotations[i*4+2] = floats[base+12]; rotations[i*4+3] = floats[base+13];
+        }
+        initSplats(positions, colors, opacities, scales, rotations);
+        console.log(`Splat data received: ${count} points`);
+    };
+
+    ws.onerror = (err) => console.error('Splat WebSocket error:', err);
+    ws.onclose = () => console.log('Splat WebSocket disconnected');
 }
 
 export async function connectMeshWebSocket() {

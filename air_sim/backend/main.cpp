@@ -1,6 +1,7 @@
 #include "deps/crow/include/crow_all.h"
 #include "mesh_data.h"
 #include "sim_room.h"
+#include "splat_data.h"
 #include "config.h"
 #include "lbm_solver.h"
 #include <nlohmann/json.hpp>
@@ -67,6 +68,10 @@ int main() {
     cors.global().origin("*").methods("POST"_method, "GET"_method, "OPTIONS"_method).headers("Content-Type");
 
     const Mesh& mesh = rooms.front().waterTight;
+    const HorizontalAlignment& alignment = rooms.front().alignment;
+
+    SplatData splat = load_splat_ply(std::filesystem::path(DATA_DIR) / "lab" / "splat.ply", alignment);
+    std::string splat_msg = build_splat_msg(splat);
 
     nlohmann::json mesh_json = {
         {"vertices", mesh.vertices},
@@ -84,6 +89,12 @@ int main() {
         .onclose([](crow::websocket::connection& conn, const std::string& reason, uint16_t) {
             std::cout << "Client disconnected: " << reason << "\n";
         });
+
+    CROW_WEBSOCKET_ROUTE(app, "/splat")
+        .onopen([&](crow::websocket::connection& conn) {
+            conn.send_binary(splat_msg);
+        })
+        .onclose([](crow::websocket::connection&, const std::string&, uint16_t) {});
 
     CROW_WEBSOCKET_ROUTE(app, "/sim/data")
         .onopen([&](crow::websocket::connection& conn) {

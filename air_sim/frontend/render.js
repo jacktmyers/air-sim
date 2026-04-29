@@ -118,7 +118,10 @@ export const renderState = {
     simSpeedBuffer: null,
     meshShaderSources: null,
     simShaderSources: null,
+    splatShaderSources: null,
     grid: null,
+    splats: null,
+    splatViewport: null,
 };
 
 export function worldToPly(v) { return [v.x, -v.z, v.y]; }
@@ -154,6 +157,16 @@ export function initMesh(vertices, colors, faces) {
     renderState.mesh.rotation.x = -Math.PI / 2;
     scene.add(renderState.mesh);
     console.log(`Mesh loaded: ${vertices.length / 3} vertices, ${faces.length / 3} triangles`);
+
+    // PLY Z → world Y after RotX(-π/2); align camera to vertical midpoint
+    let minZ = Infinity, maxZ = -Infinity;
+    for (let i = 2; i < vertices.length; i += 3) {
+        if (vertices[i] < minZ) minZ = vertices[i];
+        if (vertices[i] > maxZ) maxZ = vertices[i];
+    }
+    const midY = (minZ + maxZ) / 2;
+    camera.position.y = midY;
+    controls.target.y = midY;
 }
 
 export function initSimPoints(positions) {
@@ -264,6 +277,146 @@ export function initGrid(resolution) {
     scene.add(renderState.grid);
 }
 
+export function setSplatTransform(rx, ry, rz, sx, sy, sz, tx, ty, tz) {
+    if (!renderState.splats) return;
+    renderState.splats.rotation.set(-Math.PI / 2 + rx, ry, rz);
+    renderState.splats.scale.set(sx, sy, sz);
+    renderState.splats.position.set(tx, ty, tz);
+}
+
+let _splatRaw = null;
+let _lastSortCam = new THREE.Vector3(Infinity, Infinity, Infinity);
+let _lastSortQuat = new THREE.Quaternion();
+const _SORT_POS_THRESHOLD  = 0.01;  // world units
+const _SORT_ANG_THRESHOLD  = 0.002; // ~0.1 deg in quaternion distance
+
+function radixSort(keys, count) {
+    // 16-bit radix sort (2 passes) on unsigned 16-bit quantized keys, descending
+    const out = new Uint32Array(count);
+    const tmp = new Uint32Array(count);
+
+    // Quantize float distances to uint16 (larger float → smaller int for descending order)
+    let maxDist = 0;
+    for (let i = 0; i < count; i++) if (keys[i] > maxDist) maxDist = keys[i];
+    const scale = maxDist > 0 ? 65535 / maxDist : 1;
+    const quantized = new Uint32Array(count);
+    for (let i = 0; i < count; i++) {
+        quantized[i] = 65535 - Math.min(65535, (keys[i] * scale) | 0);
+        out[i] = i;
+    }
+
+    // Pass 1: low 16 bits
+    const cnt0 = new Int32Array(65536);
+    for (let i = 0; i < count; i++) cnt0[quantized[i] & 0xffff]++;
+    let total = 0;
+    for (let i = 0; i < 65536; i++) { const c = cnt0[i]; cnt0[i] = total; total += c; }
+    for (let i = 0; i < count; i++) { const b = quantized[out[i]] & 0xffff; tmp[cnt0[b]++] = out[i]; }
+
+    // Pass 2: high 16 bits (all zero for uint16 keys — single pass suffices)
+    // Copy tmp → out for consistent return
+    out.set(tmp);
+    return out;
+}
+
+export function sortSplats() {
+    if (!renderState.splats || !_splatRaw) return;
+
+    // Skip if camera hasn't moved or rotated significantly
+    const camPos  = camera.position;
+    const camQuat = camera.quaternion;
+    const posMoved = camPos.distanceToSquared(_lastSortCam) > _SORT_POS_THRESHOLD * _SORT_POS_THRESHOLD;
+    const angMoved = Math.abs(camQuat.dot(_lastSortQuat) - 1) > _SORT_ANG_THRESHOLD;
+    if (!posMoved && !angMoved) return;
+    _lastSortCam.copy(camPos);
+    _lastSortQuat.copy(camQuat);
+
+    const { count, positions, colors, opacities, scales, rotations } = _splatRaw;
+    const geo = renderState.splats.geometry;
+
+    renderState.splats.updateMatrixWorld();
+    const invWorld = renderState.splats.matrixWorld.clone().invert();
+    const camLocal = camPos.clone().applyMatrix4(invWorld);
+    const cx = camLocal.x, cy = camLocal.y, cz = camLocal.z;
+
+    const dists = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        const dx = positions[i*3] - cx, dy = positions[i*3+1] - cy, dz = positions[i*3+2] - cz;
+        dists[i] = dx*dx + dy*dy + dz*dz;
+    }
+
+    const order = radixSort(dists, count);
+
+    const sPos = geo.attributes.splatPosition.array;
+    const sCol = geo.attributes.splatColor.array;
+    const sOpa = geo.attributes.splatOpacity.array;
+    const sSca = geo.attributes.splatScale.array;
+    const sRot = geo.attributes.splatRot.array;
+
+    for (let j = 0; j < count; j++) {
+        const i = order[j];
+        sPos[j*3]   = positions[i*3];   sPos[j*3+1] = positions[i*3+1]; sPos[j*3+2] = positions[i*3+2];
+        sCol[j*3]   = colors[i*3];      sCol[j*3+1] = colors[i*3+1];   sCol[j*3+2] = colors[i*3+2];
+        sOpa[j]     = opacities[i];
+        sSca[j*3]   = scales[i*3];      sSca[j*3+1] = scales[i*3+1];   sSca[j*3+2] = scales[i*3+2];
+        sRot[j*4]   = rotations[i*4];   sRot[j*4+1] = rotations[i*4+1]; sRot[j*4+2] = rotations[i*4+2]; sRot[j*4+3] = rotations[i*4+3];
+    }
+
+    geo.attributes.splatPosition.needsUpdate = true;
+    geo.attributes.splatColor.needsUpdate    = true;
+    geo.attributes.splatOpacity.needsUpdate  = true;
+    geo.attributes.splatScale.needsUpdate    = true;
+    geo.attributes.splatRot.needsUpdate      = true;
+}
+
+export function initSplats(positions, colors, opacities, scales, rotations) {
+    if (renderState.splats) {
+        scene.remove(renderState.splats);
+        renderState.splats.geometry.dispose();
+        renderState.splats.material.dispose();
+        renderState.splats = null;
+    }
+
+    const count = positions.length / 3;
+    _splatRaw = { count, positions, colors, opacities, scales, rotations };
+
+    const sPos = new Float32Array(positions);
+    const sCol = new Float32Array(colors);
+    const sOpa = new Float32Array(opacities);
+    const sSca = new Float32Array(scales);
+    const sRot = new Float32Array(rotations);
+
+    // Base quad: 2 triangles, corners at (±1, ±1)
+    const quadVerts = new Float32Array([-1,-1,0,  1,-1,0,  -1,1,0,  1,1,0]);
+    const quadIdx   = new Uint16Array([0,1,2, 1,3,2]);
+
+    const geometry = new THREE.InstancedBufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(quadVerts, 3));
+    geometry.setIndex(new THREE.BufferAttribute(quadIdx, 1));
+    geometry.setAttribute('splatPosition', new THREE.InstancedBufferAttribute(sPos, 3));
+    geometry.setAttribute('splatColor',    new THREE.InstancedBufferAttribute(sCol, 3));
+    geometry.setAttribute('splatOpacity',  new THREE.InstancedBufferAttribute(sOpa, 1));
+    geometry.setAttribute('splatScale',    new THREE.InstancedBufferAttribute(sSca, 3));
+    geometry.setAttribute('splatRot',      new THREE.InstancedBufferAttribute(sRot, 4));
+    geometry.instanceCount = count;
+
+    const vp = new THREE.Vector2(renderer.domElement.width, renderer.domElement.height);
+    const material = new THREE.ShaderMaterial({
+        vertexShader:   renderState.splatShaderSources.vertexShader,
+        fragmentShader: renderState.splatShaderSources.fragmentShader,
+        uniforms: { viewport: { value: vp } },
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.NormalBlending,
+    });
+
+    renderState.splats = new THREE.Mesh(geometry, material);
+    renderState.splats.rotation.x = -Math.PI / 2;
+    renderState.splatViewport = vp;
+    scene.add(renderState.splats);
+    console.log(`Splats loaded: ${count}`);
+}
+
 export function clearGrid() {
     if (!renderState.grid) return;
     scene.remove(renderState.grid);
@@ -330,4 +483,6 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     if (renderState.grid)
         renderState.grid.material.resolution.set(window.innerWidth, window.innerHeight);
+    if (renderState.splatViewport)
+        renderState.splatViewport.set(renderer.domElement.width, renderer.domElement.height);
 });

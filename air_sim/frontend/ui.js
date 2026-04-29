@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale } from './render.js';
+import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, raycaster, pointer } from './render.js';
+
 import { simConfig, simState } from './simulation.js';
 import { sendConfig, startSim, stopSim, onSimStopped } from './connection.js';
 
@@ -37,7 +38,12 @@ moveACButton.onclick = () => {
     consoleMessage('');
     moveACButton.classList.toggle('clicked');
     movingAC = moveACButton.classList.contains('clicked');
-    if (movingAC) resetPlacementAngle();
+    if (movingAC) {
+        resetPlacementAngle();
+        controls.enabled = false;
+    } else {
+        controls.enabled = true;
+    }
 };
 
 const startSimButton = document.querySelector('#startSimButton');
@@ -173,12 +179,80 @@ placementAngleInput.addEventListener('change', () => {
 
 sendConfig();
 
-import { renderer, camera, raycaster, pointer } from './render.js';
+const splatRotXInput    = document.getElementById('splatRotXInput');
+const splatRotXDisplay  = document.getElementById('splatRotXDisplay');
+const splatRotYInput    = document.getElementById('splatRotYInput');
+const splatRotYDisplay  = document.getElementById('splatRotYDisplay');
+const splatRotZInput    = document.getElementById('splatRotZInput');
+const splatRotZDisplay  = document.getElementById('splatRotZDisplay');
+const splatScaleInput   = document.getElementById('splatScaleInput');
+const splatScaleDisplay = document.getElementById('splatScaleDisplay');
+const splatTransXInput  = document.getElementById('splatTransXInput');
+const splatTransYInput  = document.getElementById('splatTransYInput');
+const splatTransZInput  = document.getElementById('splatTransZInput');
+
+const showSplatToggle = document.getElementById('showSplatToggle');
+const showMeshToggle  = document.getElementById('showMeshToggle');
+
+showSplatToggle.addEventListener('change', () => {
+    if (renderState.splats) renderState.splats.visible = showSplatToggle.checked;
+});
+showMeshToggle.addEventListener('change', () => {
+    if (renderState.mesh) renderState.mesh.visible = showMeshToggle.checked;
+});
+
+const exportMatrixButton = document.getElementById('exportMatrixButton');
+exportMatrixButton.onclick = () => {
+    const splatMatrix = new THREE.Matrix4();
+    splatMatrix.makeTranslation(
+        parseFloat(splatTransXInput.value),
+        parseFloat(splatTransYInput.value),
+        parseFloat(splatTransZInput.value)
+    );
+
+    const rx = parseFloat(splatRotXInput.value) * Math.PI / 180;
+    const ry = parseFloat(splatRotYInput.value) * Math.PI / 180;
+    const rz = parseFloat(splatRotZInput.value) * Math.PI / 180;
+    const s  = parseFloat(splatScaleInput.value);
+
+    const rotX = new THREE.Matrix4().makeRotationX(-Math.PI / 2 + rx);
+    const rotY = new THREE.Matrix4().makeRotationY(ry);
+    const rotZ = new THREE.Matrix4().makeRotationZ(rz);
+    const scaleMatrix = new THREE.Matrix4().makeScale(s, s, s);
+
+    const combined = splatMatrix.multiply(rotX).multiply(rotY).multiply(rotZ).multiply(scaleMatrix);
+
+    const elements = [];
+    for (let i = 0; i < 16; i++) elements.push(combined.elements[i]);
+    console.log('Affine transformation matrix (left to right, top to bottom):');
+    console.log(elements.toString());
+};
+
+function applySplatTransform() {
+    const rx = parseFloat(splatRotXInput.value) * Math.PI / 180;
+    const ry = parseFloat(splatRotYInput.value) * Math.PI / 180;
+    const rz = parseFloat(splatRotZInput.value) * Math.PI / 180;
+    const s  = parseFloat(splatScaleInput.value);
+    const tx = parseFloat(splatTransXInput.value);
+    const ty = parseFloat(splatTransYInput.value);
+    const tz = parseFloat(splatTransZInput.value);
+    setSplatTransform(rx, ry, rz, s, s, s, tx, ty, tz);
+}
+
+splatRotXInput.addEventListener('input', () => { splatRotXDisplay.textContent = splatRotXInput.value + '°'; applySplatTransform(); });
+splatRotYInput.addEventListener('input', () => { splatRotYDisplay.textContent = splatRotYInput.value + '°'; applySplatTransform(); });
+splatRotZInput.addEventListener('input', () => { splatRotZDisplay.textContent = splatRotZInput.value + '°'; applySplatTransform(); });
+splatScaleInput.addEventListener('input', () => { splatScaleDisplay.textContent = splatScaleInput.value; applySplatTransform(); });
+splatTransXInput.addEventListener('input', applySplatTransform);
+splatTransYInput.addEventListener('input', applySplatTransform);
+splatTransZInput.addEventListener('input', applySplatTransform);
+
 
 renderer.domElement.addEventListener('click', () => {
     if (!movingAC || !acGroup.visible) return;
     moveACButton.classList.remove('clicked');
     movingAC = false;
+    controls.enabled = true;
     updateOutVel();
     updateInVel();
     sendConfig();

@@ -7,6 +7,11 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
+struct HorizontalAlignment {
+    glm::vec2 mean;
+    float c, s;
+};
+
 struct Mesh {
     std::vector<float> vertices;
     std::vector<float> colors;
@@ -81,7 +86,7 @@ struct Mesh {
         return {nx/len, ny/len, nz/len};
     }
 
-    void align_horizontal() {
+    HorizontalAlignment align_horizontal() {
         size_t n = vertices.size() / 3;
 
         glm::vec2 mean(0.0f);
@@ -106,5 +111,7 @@ struct Mesh {
             vertices[i*3]   = vr.x;
             vertices[i*3+1] = vr.y;
         }
+
+        return {mean, c, s};
     }
 };

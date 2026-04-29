@@ -11,6 +11,7 @@
 struct SimRoom {
     std::string name;
     Mesh waterTight;
+    HorizontalAlignment alignment;
 };
 
 std::vector<SimRoom> load_in_rooms(const std::filesystem::path& data_dir) {
@@ -61,10 +62,11 @@ std::vector<SimRoom> load_in_rooms(const std::filesystem::path& data_dir) {
         }
 
         mesh.build_adjacency();
-        mesh.align_horizontal();
+        HorizontalAlignment alignment = mesh.align_horizontal();
 
         SimRoom room;
         room.name = entry.path().filename().string();
+        room.alignment = alignment;
         room.waterTight = std::move(mesh);
 
         std::cout << "Loaded: " << room.name << " (" << ai_mesh->mNumVertices << " vertices)\n";

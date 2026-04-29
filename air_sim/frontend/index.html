@@ -125,6 +125,32 @@
                 <label>Display Velocity Scale <input type="number" id="displayScaleInput" value="0.01" step="0.01" min="0.001"></label>
             </div>
 
+            <div class="config-section">
+                <span class="config-section-label">Debug</span>
+                <label>Show Splat <input type="checkbox" id="showSplatToggle" checked></label>
+                <label>Show Mesh  <input type="checkbox" id="showMeshToggle" checked></label>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Splat Rot X</span><span id="splatRotXDisplay">0°</span></div>
+                    <input type="range" id="splatRotXInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Splat Rot Y</span><span id="splatRotYDisplay">0°</span></div>
+                    <input type="range" id="splatRotYInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Splat Rot Z</span><span id="splatRotZDisplay">0°</span></div>
+                    <input type="range" id="splatRotZInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-row-header"><span>Splat Scale</span><span id="splatScaleDisplay">1.0</span></div>
+                    <input type="range" id="splatScaleInput" value="1.0" min="0.01" max="5" step="0.01" autocomplete="off">
+                </div>
+                <label>Splat Trans X <input type="number" id="splatTransXInput" value="0.0" step="0.05" autocomplete="off"></label>
+                <label>Splat Trans Y <input type="number" id="splatTransYInput" value="0.0" step="0.05" autocomplete="off"></label>
+                <label>Splat Trans Z <input type="number" id="splatTransZInput" value="0.0" step="0.05" autocomplete="off"></label>
+            </div>
+
+            <button id="exportMatrixButton" class="toggle-button">Export Splat Matrix</button>
             <button id="startSimButton" class="toggle-button">Start Simulation</button>
             <div id="console"></div>
         </div>
