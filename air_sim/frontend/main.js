@@ -1,6 +1,6 @@
 import { renderer, scene, camera, controls, shaderMaterials } from './render.js';
 import { simState } from './simulation.js';
-import { updateSimPoints, updateSimArrows } from './render.js';
+import { updateSimPoints, updateStreamlines, updateVolumeRaymarching } from './render.js';
 import { connectMeshWebSocket } from './connection.js';
 import './ui.js';
 
@@ -15,7 +15,8 @@ function animate() {
 
     controls.update();
     updateSimPoints(simState.frameData);
-    updateSimArrows(simState.positions, simState.frameData);
+    updateStreamlines(simState.positions, simState.frameData);
+    updateVolumeRaymarching(simState.frameData);
     renderer.render(scene, camera);
 }
 

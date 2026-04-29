@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale } from './render.js';
+import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, initStreamlines, clearStreamlines, clearVolumeRaymarching, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, initVolumeRaymarching } from './render.js';
 import { simConfig, simState } from './simulation.js';
 import { sendConfig, startSim, stopSim, onSimStopped } from './connection.js';
+import { vizFlags } from './render.js';
 
 let movingAC = false;
 let outVelMag       = 1.0;
@@ -9,6 +10,51 @@ let inVelMag        = 1.0;
 let outflowAngleDeg  = 0;
 let intakeAngleDeg   = 0;
 let placementAngleDeg = 0;
+
+const toggleStreamlinesButton = document.getElementById('toggleStreamlinesButton');
+
+toggleStreamlinesButton.onclick = () => {
+    vizFlags.streamlines = !vizFlags.streamlines;
+
+    toggleStreamlinesButton.classList.toggle('clicked', vizFlags.streamlines);
+
+    if (!simState.positions) return;
+
+    if (vizFlags.streamlines) {
+        initStreamlines(simState.positions);
+    } else {
+        clearStreamlines();
+    }
+};
+
+const toggleVolumeButton = document.getElementById('toggleVolumeButton');
+
+toggleVolumeButton.onclick = () => {
+    vizFlags.volume = !vizFlags.volume;
+
+    toggleVolumeButton.classList.toggle('clicked', vizFlags.volume);
+
+    if (!simState.positions) return;
+
+    if (vizFlags.volume) {
+        initVolumeRaymarching(simState.positions).catch(console.error);
+    } else {
+        clearVolumeRaymarching();
+    }
+};
+
+const toggleSimPointsButton = document.getElementById('toggleSimPointsButton');
+toggleSimPointsButton.classList.toggle('clicked', vizFlags.simPoints);
+
+toggleSimPointsButton.onclick = () => {
+    vizFlags.simPoints = !vizFlags.simPoints;
+
+    toggleSimPointsButton.classList.toggle('clicked', vizFlags.simPoints);
+
+    if (!renderState.simPoints) return;
+
+    renderState.simPoints.visible = vizFlags.simPoints;
+};
 
 function updateOutVel() {
     const d = getOutflowConfig();
