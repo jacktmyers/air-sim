@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a1a);
@@ -28,10 +30,72 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 export const raycaster = new THREE.Raycaster();
 export const pointer = new THREE.Vector2();
 
-export const dot = new THREE.Mesh(
-    new THREE.SphereGeometry(0.05, 16, 16),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 })
-);
+// export const dot = new THREE.Mesh(
+//     new THREE.SphereGeometry(0.05, 16, 16),
+//     new THREE.MeshBasicMaterial({ color: 0xff0000 })
+// );
+
+export const dot = new THREE.Group();
+
+export const fbxLoader = new FBXLoader();
+
+export const shaderMaterials = [];
+
+const textureLoader = new THREE.TextureLoader();
+
+const acDiffuseMap = textureLoader.load("../backend/data/AC/Textures/Ac_Base_Color.jpg");
+acDiffuseMap.colorSpace = THREE.SRGBColorSpace;
+
+const acNormalMap = textureLoader.load("../backend/data/AC/Textures/Ac_Normal_DirectX.jpg");
+
+async function createACShaderMaterial() {
+    const shaderSources = await loadACShaderSources();
+
+    return new THREE.ShaderMaterial({
+        vertexShader: shaderSources.vertexShader,
+        fragmentShader: shaderSources.fragmentShader,
+
+        uniforms: {
+            uDiffuseMap: {
+                value: acDiffuseMap
+            },
+            uNormalMap: {
+                value: acNormalMap
+            },
+            uLightDir: {
+                value: new THREE.Vector3(0.4, 1.0, 0.5).normalize()
+            },
+            uCameraPos: {
+                value: new THREE.Vector3()
+            }
+        },
+
+        side: THREE.DoubleSide
+    });
+}
+
+fbxLoader.load("../backend/data/AC/AC.fbx", async (fbx) => {
+    fbx.scale.setScalar(0.02);
+
+    const materialPromises = [];
+
+    fbx.traverse((child) => {
+        if (!child.isMesh) return;
+
+        child.frustumCulled = false;
+
+        const promise = createACShaderMaterial().then((shaderMat) => {
+            child.material = shaderMat;
+            shaderMaterials.push(shaderMat);
+        });
+
+        materialPromises.push(promise);
+    });
+
+    await Promise.all(materialPromises);
+
+    dot.add(fbx);
+});
 
 const arrowLength = 0.25;
 const arrowOffset = 0.27;
@@ -116,8 +180,11 @@ export const renderState = {
     mesh: null,
     simPoints: null,
     simSpeedBuffer: null,
+    simArrows: null,
+    simArrowVelocityBuffer: null,
     meshShaderSources: null,
     simShaderSources: null,
+    acShaderSources: null,
     grid: null,
 };
 
@@ -131,6 +198,17 @@ export async function loadShaderSources(vertexPath, fragmentPath) {
     return { vertexShader, fragmentShader };
 }
 
+async function loadACShaderSources() {
+    if (!renderState.acShaderSources) {
+        renderState.acShaderSources = await loadShaderSources(
+            "shaders/ac_vertex.glsl",
+            "shaders/ac_fragment.glsl"
+        );
+    }
+
+    return renderState.acShaderSources;
+}
+
 export function initShaderMaterial({ vertexShader, fragmentShader }, uniforms) {
     return new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, side: THREE.FrontSide });
 }
@@ -141,6 +219,7 @@ export function initMesh(vertices, colors, faces) {
         renderState.mesh.geometry.dispose();
         renderState.mesh.material.dispose();
     }
+
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
     if (colors && colors.length > 0)
@@ -156,22 +235,180 @@ export function initMesh(vertices, colors, faces) {
     console.log(`Mesh loaded: ${vertices.length / 3} vertices, ${faces.length / 3} triangles`);
 }
 
+// export function initSimPoints(positions) {
+//     clearSimPoints();
+//     const count = positions.length / 3;
+//     renderState.simSpeedBuffer = new Float32Array(count);
+//     const geometry = new THREE.BufferGeometry();
+//     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+//     geometry.setAttribute('speed', new THREE.BufferAttribute(renderState.simSpeedBuffer, 1));
+//     const material = new THREE.ShaderMaterial({
+//         vertexShader: renderState.simShaderSources.vertexShader,
+//         fragmentShader: renderState.simShaderSources.fragmentShader,
+//         uniforms: { uMaxSpeed: { value: _displayScale } },
+//         transparent: true,
+//         depthWrite: false,
+//     });
+//     renderState.simPoints = new THREE.Points(geometry, material);
+//     renderState.simPoints.rotation.x = -Math.PI / 2;
+//     scene.add(renderState.simPoints);
+// }
+
+let _arrowEvery = 4;
+let _arrowScale = 3.0;
+let _arrowMaxSpeed = 0.05;
+
+function createArrowGeometry() {
+    const shaft = new THREE.CylinderGeometry(
+        0.012,
+        0.012,
+        0.16,
+        8,
+        1,
+        false
+    );
+
+    const head = new THREE.ConeGeometry(
+        0.04,
+        0.10,
+        16,
+        1,
+        true   // IMPORTANT: openEnded = true, removes closed polygon cap
+    );
+
+    // Geometry points along +Y.
+    shaft.translate(0, 0.08, 0);
+    head.translate(0, 0.21, 0);
+
+    return mergeGeometries([shaft, head], false);
+}
+
+export function initSimArrows(positions) {
+    clearSimArrows();
+
+    const arrowGeom = createArrowGeometry();
+
+    const arrowMat = new THREE.MeshBasicMaterial({
+        color: 0x00aaff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false
+    });
+
+    const cellCount = positions.length / 3;
+    const arrowCount = Math.ceil(cellCount / _arrowEvery);
+
+    renderState.simArrows = new THREE.InstancedMesh(
+        arrowGeom,
+        arrowMat,
+        arrowCount
+    );
+
+    renderState.simArrows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    // Same coordinate transform as sim points
+    renderState.simArrows.rotation.x = -Math.PI / 2;
+
+    scene.add(renderState.simArrows);
+}
+
+const _arrowDummy = new THREE.Object3D();
+const _arrowDir = new THREE.Vector3();
+const _arrowBaseDir = new THREE.Vector3(0, 1, 0); // arrow geometry points +Y
+const _arrowQuat = new THREE.Quaternion();
+
+export function updateSimArrows(positions, frameData) {
+    if (!renderState.simArrows || !positions || !frameData) return;
+
+    let instanceIndex = 0;
+    const cellCount = positions.length / 3;
+
+    for (let i = 0; i < cellCount; i += _arrowEvery) {
+        const p = i * 3;
+        const f = i * 5;
+
+        const vx = frameData[f + 0];
+        const vy = frameData[f + 1];
+        const vz = frameData[f + 2];
+        const speed = frameData[f + 3];
+
+        _arrowDummy.position.set(
+            positions[p + 0],
+            positions[p + 1],
+            positions[p + 2]
+        );
+
+        if (speed < 0.00001) {
+            _arrowDummy.scale.set(0, 0, 0);
+        } else {
+            _arrowDir.set(vx, vy, vz).normalize();
+            _arrowQuat.setFromUnitVectors(_arrowBaseDir, _arrowDir);
+
+            _arrowDummy.quaternion.copy(_arrowQuat);
+
+            const len = Math.min(speed / _arrowMaxSpeed, 1.0) * _arrowScale;
+
+            // Geometry points along Y, so stretch Y
+            _arrowDummy.scale.set(1.0, len, 1.0);
+        }
+
+        _arrowDummy.updateMatrix();
+        renderState.simArrows.setMatrixAt(instanceIndex, _arrowDummy.matrix);
+
+        instanceIndex++;
+    }
+
+    renderState.simArrows.instanceMatrix.needsUpdate = true;
+}
+
+export function clearSimArrows() {
+    if (!renderState.simArrows) return;
+
+    scene.remove(renderState.simArrows);
+
+    renderState.simArrows.geometry.dispose();
+    renderState.simArrows.material.dispose();
+
+    renderState.simArrows = null;
+}
+
 export function initSimPoints(positions) {
     clearSimPoints();
+
     const count = positions.length / 3;
+
     renderState.simSpeedBuffer = new Float32Array(count);
+
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-    geometry.setAttribute('speed', new THREE.BufferAttribute(renderState.simSpeedBuffer, 1));
+
+    geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(new Float32Array(positions), 3)
+    );
+
+    geometry.setAttribute(
+        'speed',
+        new THREE.BufferAttribute(renderState.simSpeedBuffer, 1)
+    );
+
     const material = new THREE.ShaderMaterial({
         vertexShader: renderState.simShaderSources.vertexShader,
         fragmentShader: renderState.simShaderSources.fragmentShader,
-        uniforms: { uMaxSpeed: { value: _displayScale } },
+
+        uniforms: {
+            uMaxSpeed: { value: _displayScale },
+            uPointSize: { value: 18.0 },
+            uOpacity: { value: 0.45 }
+        },
+
         transparent: true,
         depthWrite: false,
+        blending: THREE.AdditiveBlending
     });
+
     renderState.simPoints = new THREE.Points(geometry, material);
     renderState.simPoints.rotation.x = -Math.PI / 2;
+
     scene.add(renderState.simPoints);
 }
 
