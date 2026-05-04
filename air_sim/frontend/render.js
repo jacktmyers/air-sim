@@ -415,6 +415,8 @@ export function initStreamlines(positions) {
     lines.rotation.x = -Math.PI / 2;
 
     renderState.streamlines = lines;
+
+    renderState.streamlines.renderOrder = Infinity;
     scene.add(renderState.streamlines);
 }
 
@@ -600,6 +602,8 @@ export async function initVolumeRaymarching(positions) {
     renderState.volumeRaymarchMesh = new THREE.Mesh(geometry, material);
 
     renderState.volumeRaymarchMesh.rotation.x = -Math.PI / 2;
+
+    renderState.volumeRaymarchMesh.renderOrder = Infinity;
 
     scene.add(renderState.volumeRaymarchMesh);
 }
