@@ -1,4 +1,4 @@
-import { renderState, loadShaderSources, initMesh, initSimPoints, clearSimPoints, updateSimPoints, initSplats, initSimArrows, clearSimArrows } from './render.js';
+import { renderState, loadShaderSources, initMesh, initSimPoints, clearSimPoints, updateSimPoints, initSplats, clearVolumeRaymarching, initVolumeRaymarching, clearStreamlines, initStreamlines, vizFlags } from './render.js';
 import { simConfig, simState } from './simulation.js';
 
 export const HOSTED_PORT = 42067;
@@ -28,8 +28,9 @@ function connectSimWebSocket() {
         if (type === 0x01) {
             const count = view.getUint32(1, true);
             simState.positions = new Float32Array(event.data.slice(5), 0, count * 3);
-            initSimPoints(simState.positions);
-            //initSimArrows(simState.positions);
+            if(vizFlags.simPoints) initSimPoints(simState.positions);
+            if(vizFlags.streamlines) initStreamlines(simState.positions);
+            if(vizFlags.volume) initVolumeRaymarching(simState.positions).catch(console.error);
             console.log(`Sim positions received: ${count} cells`);
         } else if (type === 0x02) {
             const count = (event.data.byteLength - 1) / (5 * 4);
@@ -47,7 +48,8 @@ function connectSimWebSocket() {
             simState.positions = null;
             simState.frameData = null;
             clearSimPoints();
-            clearSimArrows();
+            clearStreamlines();
+            clearVolumeRaymarching();
             if (simStoppedCallback) simStoppedCallback();
         }
         console.log('Sim WebSocket disconnected');
@@ -79,7 +81,8 @@ export async function stopSim() {
     simState.positions = null;
     simState.frameData = null;
     clearSimPoints();
-    clearSimArrows();
+    clearStreamlines();
+    clearVolumeRaymarching();
     simState.running = false;
     return { ok: true };
 }
