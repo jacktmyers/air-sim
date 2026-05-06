@@ -37,6 +37,7 @@ public:
     int nx() const { return Nx_; }
     int ny() const { return Ny_; }
     int nz() const { return Nz_; }
+    float voxel_size() const { return voxel_size_; }
 
     CellType cell_type(int x, int y, int z) const {
         return h_cell_type_[cell_idx(x, y, z)];
@@ -61,6 +62,7 @@ private:
     int Nx_, Ny_, Nz_;
     float voxel_size_;
     AABB aabb_;
+
     float tau_;
 
     std::vector<CellType> h_cell_type_;

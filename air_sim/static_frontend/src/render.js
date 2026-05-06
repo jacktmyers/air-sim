@@ -8,7 +8,7 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+scene.background = new THREE.Color(0x1a1a1a);
 
 export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(3, 3, 3);
@@ -269,7 +269,7 @@ export const renderState = {
     grid: null,
     splats: null,
     splatViewport: null,
-    solidCells: null
+    grid: null
 };
 
 export const vizFlags = {
@@ -938,59 +938,6 @@ export function clearGrid() {
     renderState.grid.geometry.dispose();
     renderState.grid.material.dispose();
     renderState.grid = null;
-}
-
-export function initSolidCells({ raw, count, voxelSize }) {
-    clearSolidCells();
-    if (count === 0) return;
-
-    const buckets = { solid: [], emitter: [], intake: [] };
-    for (let i = 0; i < count; i++) {
-        const x = raw[i * 4], y = raw[i * 4 + 1], z = raw[i * 4 + 2];
-        const t = raw[i * 4 + 3];
-        if (t === 1) buckets.solid.push(x, y, z);
-        else if (t === 2) buckets.emitter.push(x, y, z);
-        else if (t === 3) buckets.intake.push(x, y, z);
-    }
-
-    const specs = [
-        { key: 'solid',   color: 0x888888, opacity: 0.15, renderOrder: 0 },
-        { key: 'emitter', color: 0x0088ff, opacity: 0.7,  renderOrder: 1 },
-        { key: 'intake',  color: 0xff8800, opacity: 0.7,  renderOrder: 1 },
-    ];
-
-    const meshes = [];
-    for (const { key, color, opacity, renderOrder } of specs) {
-        const pts = buckets[key];
-        if (pts.length === 0) continue;
-        const n = pts.length / 3;
-        const geo = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
-        const im = new THREE.InstancedMesh(geo, mat, n);
-        im.renderOrder = renderOrder;
-        const dummy = new THREE.Object3D();
-        for (let i = 0; i < n; i++) {
-            dummy.position.set(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2]);
-            dummy.updateMatrix();
-            im.setMatrixAt(i, dummy.matrix);
-        }
-        im.instanceMatrix.needsUpdate = true;
-        im.rotation.x = -Math.PI / 2;
-        meshes.push(im);
-        scene.add(im);
-    }
-
-    renderState.solidCells = meshes;
-}
-
-export function clearSolidCells() {
-    if (!renderState.solidCells) return;
-    for (const m of renderState.solidCells) {
-        scene.remove(m);
-        m.geometry.dispose();
-        m.material.dispose();
-    }
-    renderState.solidCells = null;
 }
 
 let _emitVoxel = null, _intakeVoxel = null;

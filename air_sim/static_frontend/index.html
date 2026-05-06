@@ -147,7 +147,6 @@
                         Show Sim Points
                     </button>
                     <button id="showGridButton" class="toggle-button">Show Grid</button>
-                    <label>Show Solid Grid Elements <input type="checkbox" id="showSolidCellsToggle"></label>
                     <label>Resolution    <input type="number" id="resolutionInput" value="20"  min="4" step="1"></label>
                     <label>Tau           <input type="number" id="tauInput"        value="0.55" step="0.01" min="0.51" max="1.5"></label>
                     <label>Warmup Steps  <input type="number" id="warmupInput"     value="0"   min="0" step="100"></label>
@@ -200,6 +199,6 @@
             label.addEventListener('click', () => label.closest('.config-section').classList.toggle('collapsed'));
         });
     </script>
-    <script type="module" src="main.js"></script>
+    <script type="module" src="src/main.js"></script>
 </body>
 </html>

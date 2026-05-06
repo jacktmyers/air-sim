@@ -29,6 +29,10 @@ target_compile_definitions(air_sim PRIVATE
     DATA_DIR="${CMAKE_SOURCE_DIR}/data"
 )
 
+target_compile_definitions(air_sim PRIVATE
+    RECORDING_DIR="${CMAKE_SOURCE_DIR}/recordings"
+)
+
 target_include_directories(air_sim PRIVATE
     ${ASIO_INCLUDE_DIR}
     ${CROW_INCLUDE_DIR}

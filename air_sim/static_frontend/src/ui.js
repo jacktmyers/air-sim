@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, fpControls, enterDollhouseMode, enterWalkthroughMode, walkthroughMode, setWalkSpeed, raycaster, pointer, initStreamlines, clearStreamlines, clearVolumeRaymarching, initVolumeRaymarching, initSolidCells, clearSolidCells } from './render.js';
+import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, fpControls, enterDollhouseMode, enterWalkthroughMode, walkthroughMode, setWalkSpeed, raycaster, pointer, initStreamlines, clearStreamlines, clearVolumeRaymarching, initVolumeRaymarching } from './render.js';
 
 import { simConfig, simState } from './simulation.js';
-import { sendConfig, startSim, stopSim, onSimStopped, captureFrames, abortCapture, saveRecording, saveScene, fetchSolidCells } from './connection.js';
+import { sendConfig, startSim, stopSim, onSimStopped, captureFrames, abortCapture, saveRecording, saveScene } from './connection.js';
 import { vizFlags } from './render.js';
 
 function _fmt2(n) { return parseFloat(n).toFixed(2); }
@@ -126,8 +126,6 @@ onSimStopped(() => {
     startSimButton.classList.remove('clicked');
     startSimButton.innerHTML = 'Start Simulation';
     consoleMessage('Simulation stopped');
-    clearSolidCells();
-    showSolidCellsToggle.checked = false;
 });
 
 const showGridButton = document.querySelector('#showGridButton');
@@ -148,25 +146,6 @@ showGridButton.onclick = () => {
         acGroup.visible = acVisibleBeforeGrid;
     }
 };
-
-const showSolidCellsToggle = document.getElementById('showSolidCellsToggle');
-showSolidCellsToggle.addEventListener('change', async () => {
-    if (showSolidCellsToggle.checked) {
-        if (!simState.running) {
-            consoleMessage('Start the simulation first to view solid cells');
-            showSolidCellsToggle.checked = false;
-            return;
-        }
-        try {
-            const data = await fetchSolidCells();
-            if (data) initSolidCells(data);
-        } catch (e) {
-            consoleMessage(`Solid cells error: ${e.message}`);
-        }
-    } else {
-        clearSolidCells();
-    }
-});
 
 const inputBindings = [
     ['outVelInput',    v => { outVelMag = v; updateOutVel(); }],
