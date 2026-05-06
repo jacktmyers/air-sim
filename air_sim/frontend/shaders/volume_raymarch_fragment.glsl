@@ -16,7 +16,8 @@ in vec3 vLocalPos;
 out vec4 outColor;
 
 vec2 intersectBox(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax) {
-    vec3 invDir = 1.0 / rayDir;
+    vec3 safeDir = sign(rayDir) * max(abs(rayDir), vec3(0.00001));
+    vec3 invDir = 1.0 / safeDir;
 
     vec3 t0 = (boxMin - rayOrigin) * invDir;
     vec3 t1 = (boxMax - rayOrigin) * invDir;
@@ -59,7 +60,7 @@ void main() {
         if (accum.a > 0.95) break;
 
         vec3 localPos = rayOrigin + rayDir * t;
-        vec3 uvw = (localPos - uBoxMin) / (uBoxMax - uBoxMin);
+        vec3 uvw = localPos + vec3(0.5);
 
         if (
             any(lessThan(uvw, vec3(0.0))) ||

@@ -260,6 +260,7 @@ export const renderState = {
     volumeRaymarchMesh: null,
     volumeTexture: null,
     volumeRaymarchShaderSources: null,
+    volumeRaymarchGroup: null,
     volumeGridInfo: null,
     meshShaderSources: null,
     simShaderSources: null,
@@ -571,8 +572,7 @@ export async function initVolumeRaymarching(positions) {
     const size = new THREE.Vector3().subVectors(grid.max, grid.min);
     const center = new THREE.Vector3().addVectors(grid.min, grid.max).multiplyScalar(0.5);
 
-    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
-    geometry.translate(center.x, center.y, center.z);
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
 
     const material = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3,
@@ -582,30 +582,38 @@ export async function initVolumeRaymarching(positions) {
 
         uniforms: {
             uVolumeTex: { value: texture },
-            uBoxMin: { value: grid.min },
-            uBoxMax: { value: grid.max },
+
+            uBoxMin: { value: new THREE.Vector3(-0.5, -0.5, -0.5) },
+            uBoxMax: { value: new THREE.Vector3( 0.5,  0.5,  0.5) },
+
             uCameraLocalPos: { value: new THREE.Vector3() },
 
-            uStepSize: { value: Math.min(size.x, size.y, size.z) / 192.0 },
-            uOpacity: { value: 0.12 },
-            uThreshold: { value: 0.02 }
+            uStepSize: { value: 1.0 / 192.0 },
+            uOpacity: { value: 0.08 },
+            uThreshold: { value: 0.03 }
         },
 
         transparent: true,
         depthWrite: false,
-
         depthTest: false,
-
-        side: THREE.BackSide
+        side: THREE.DoubleSide
     });
 
-    renderState.volumeRaymarchMesh = new THREE.Mesh(geometry, material);
+    const volumeGroup = new THREE.Group();
+    volumeGroup.rotation.x = -Math.PI / 2;
 
-    renderState.volumeRaymarchMesh.rotation.x = -Math.PI / 2;
+    const volumeMesh = new THREE.Mesh(geometry, material);
+    volumeMesh.position.copy(center);
+    volumeMesh.scale.copy(size);
 
-    renderState.volumeRaymarchMesh.renderOrder = Infinity;
+    volumeMesh.frustumCulled = false;
+    volumeMesh.renderOrder = 10;
 
-    scene.add(renderState.volumeRaymarchMesh);
+    volumeGroup.add(volumeMesh);
+    scene.add(volumeGroup);
+
+    renderState.volumeRaymarchMesh = volumeMesh;
+    renderState.volumeRaymarchGroup = volumeGroup;
 }
 
 const _volumeLocalCamera = new THREE.Vector3();
@@ -646,7 +654,7 @@ export function updateVolumeRaymarching(frameData) {
 export function clearVolumeRaymarching() {
     if (!renderState.volumeRaymarchMesh) return;
 
-    scene.remove(renderState.volumeRaymarchMesh);
+    scene.remove(renderState.volumeRaymarchGroup);
 
     renderState.volumeRaymarchMesh.geometry.dispose();
     renderState.volumeRaymarchMesh.material.dispose();
@@ -656,6 +664,7 @@ export function clearVolumeRaymarching() {
     }
 
     renderState.volumeRaymarchMesh = null;
+    renderState.volumeRaymarchGroup = null;
     renderState.volumeTexture = null;
     renderState.volumeGridInfo = null;
 }
