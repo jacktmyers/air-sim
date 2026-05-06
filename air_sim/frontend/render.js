@@ -326,9 +326,7 @@ export function initMesh(vertices, colors, faces) {
         geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
     geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(faces), 1));
     geometry.computeVertexNormals();
-    const material = initShaderMaterial(renderState.meshShaderSources, {
-        uLightDirection: { value: new THREE.Vector3(1, 1, 1).normalize() },
-    });
+    const material = initShaderMaterial(renderState.meshShaderSources);
     renderState.mesh = new THREE.Mesh(geometry, material);
     renderState.mesh.rotation.x = -Math.PI / 2;
     scene.add(renderState.mesh);
