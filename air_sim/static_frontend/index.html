@@ -147,7 +147,6 @@
                         Show Sim Points
                     </button>
                     <button id="showGridButton" class="toggle-button">Show Grid</button>
-                    <label>Show Solid Grid Elements <input type="checkbox" id="showSolidCellsToggle"></label>
                     <label>Resolution    <input type="number" id="resolutionInput" value="20"  min="4" step="1"></label>
                     <label>Tau           <input type="number" id="tauInput"        value="0.55" step="0.01" min="0.51" max="1.5"></label>
                     <label>Warmup Steps  <input type="number" id="warmupInput"     value="0"   min="0" step="100"></label>
@@ -155,11 +154,6 @@
                     <label>Walk Speed <input type="number" id="walkSpeedInput" value="0.007" step="0.001" min="0.00001"></label>
                     <label>Show Splat <input type="checkbox" id="showSplatToggle" checked></label>
                     <label>Show Mesh  <input type="checkbox" id="showMeshToggle" checked></label>
-                    <label>Point Cloud <input type="checkbox" id="meshPointCloudToggle"></label>
-                    <div class="slider-row">
-                        <div class="slider-row-header"><span>Point Size</span><span id="pointSizeDisplay">0.020</span></div>
-                        <input type="range" id="pointSizeInput" value="0.02" min="0.001" max="0.15" step="0.001" autocomplete="off">
-                    </div>
                     <div class="slider-row">
                         <div class="slider-row-header"><span>Splat Rot X</span><span id="splatRotXDisplay">0°</span></div>
                         <input type="range" id="splatRotXInput" value="0" min="-180" max="180" step="0.25" autocomplete="off">
@@ -205,6 +199,6 @@
             label.addEventListener('click', () => label.closest('.config-section').classList.toggle('collapsed'));
         });
     </script>
-    <script type="module" src="main.js"></script>
+    <script type="module" src="src/main.js"></script>
 </body>
 </html>

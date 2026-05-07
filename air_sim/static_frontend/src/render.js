@@ -8,7 +8,7 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+scene.background = new THREE.Color(0x1a1a1a);
 
 export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(3, 3, 3);
@@ -251,8 +251,6 @@ export function getInflowConfig() {
 
 export const renderState = {
     mesh: null,
-    meshPointCloud: null,
-    meshPointCloudMode: false,
     simPoints: null,
     simSpeedBuffer: null,
     streamlines: null,
@@ -263,7 +261,6 @@ export const renderState = {
     volumeRaymarchMesh: null,
     volumeTexture: null,
     volumeRaymarchShaderSources: null,
-    volumeRaymarchGroup: null,
     volumeGridInfo: null,
     meshShaderSources: null,
     simShaderSources: null,
@@ -272,7 +269,7 @@ export const renderState = {
     grid: null,
     splats: null,
     splatViewport: null,
-    solidCells: null
+    grid: null
 };
 
 export const vizFlags = {
@@ -317,60 +314,7 @@ export function initShaderMaterial({ vertexShader, fragmentShader }, uniforms) {
     return new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, side: THREE.FrontSide });
 }
 
-export function setMeshPointCloudMode(enabled) {
-    renderState.meshPointCloudMode = enabled;
-    if (renderState.mesh) renderState.mesh.visible = !enabled;
-    if (renderState.meshPointCloud) renderState.meshPointCloud.visible = enabled;
-}
-
-export function setMeshPointSize(size) {
-    if (renderState.meshPointCloud) renderState.meshPointCloud.material.uniforms.uPointSize.value = size;
-}
-
-const _pointCloudVert = /* glsl */`
-attribute vec3 color;
-varying vec3 vColor;
-uniform float uPointSize;
-uniform float uResolutionY;
-
-void main() {
-    vColor = color;
-
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-
-    // Back-face cull: discard points whose surface normal faces away from camera
-    vec3 vsNormal = normalize(normalMatrix * normal);
-    vec3 vsViewDir = normalize(-mvPosition.xyz);
-    if (dot(vsNormal, vsViewDir) <= 0.0) {
-        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
-        gl_PointSize = 0.0;
-        return;
-    }
-
-    gl_Position = projectionMatrix * mvPosition;
-    // World-unit size with perspective attenuation
-    gl_PointSize = uPointSize * projectionMatrix[1][1] * uResolutionY * 0.5 / (-mvPosition.z);
-}
-`;
-
-const _pointCloudFrag = /* glsl */`
-varying vec3 vColor;
-
-void main() {
-    // Circular point
-    vec2 c = gl_PointCoord - 0.5;
-    if (dot(c, c) > 0.25) discard;
-    gl_FragColor = vec4(vColor, 1.0);
-}
-`;
-
 export function initMesh(vertices, colors, faces) {
-    if (renderState.meshPointCloud) {
-        scene.remove(renderState.meshPointCloud);
-        renderState.meshPointCloud.geometry.dispose();
-        renderState.meshPointCloud.material.dispose();
-        renderState.meshPointCloud = null;
-    }
     if (renderState.mesh) {
         scene.remove(renderState.mesh);
         renderState.mesh.geometry.dispose();
@@ -386,29 +330,7 @@ export function initMesh(vertices, colors, faces) {
     const material = initShaderMaterial(renderState.meshShaderSources);
     renderState.mesh = new THREE.Mesh(geometry, material);
     renderState.mesh.rotation.x = -Math.PI / 2;
-    renderState.mesh.visible = !renderState.meshPointCloudMode;
     scene.add(renderState.mesh);
-
-    const pointsGeo = new THREE.BufferGeometry();
-    pointsGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-    // Normals are needed for back-face culling in the point shader
-    pointsGeo.setAttribute('normal', geometry.attributes.normal.clone());
-    const hasColor = colors && colors.length > 0;
-    const fallbackColors = hasColor ? colors : new Array(vertices.length).fill(0.8);
-    pointsGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(fallbackColors), 3));
-    const pointsMat = new THREE.ShaderMaterial({
-        vertexShader: _pointCloudVert,
-        fragmentShader: _pointCloudFrag,
-        uniforms: {
-            uPointSize:   { value: 0.02 },
-            uResolutionY: { value: renderer.domElement.height },
-        },
-    });
-    renderState.meshPointCloud = new THREE.Points(pointsGeo, pointsMat);
-    renderState.meshPointCloud.rotation.x = -Math.PI / 2;
-    renderState.meshPointCloud.visible = renderState.meshPointCloudMode;
-    scene.add(renderState.meshPointCloud);
-
     console.log(`Mesh loaded: ${vertices.length / 3} vertices, ${faces.length / 3} triangles`);
 
     // PLY Z → world Y after RotX(-π/2); align camera to vertical midpoint
@@ -648,7 +570,8 @@ export async function initVolumeRaymarching(positions) {
     const size = new THREE.Vector3().subVectors(grid.max, grid.min);
     const center = new THREE.Vector3().addVectors(grid.min, grid.max).multiplyScalar(0.5);
 
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+    geometry.translate(center.x, center.y, center.z);
 
     const material = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3,
@@ -658,38 +581,30 @@ export async function initVolumeRaymarching(positions) {
 
         uniforms: {
             uVolumeTex: { value: texture },
-
-            uBoxMin: { value: new THREE.Vector3(-0.5, -0.5, -0.5) },
-            uBoxMax: { value: new THREE.Vector3( 0.5,  0.5,  0.5) },
-
+            uBoxMin: { value: grid.min },
+            uBoxMax: { value: grid.max },
             uCameraLocalPos: { value: new THREE.Vector3() },
 
-            uStepSize: { value: 1.0 / 192.0 },
-            uOpacity: { value: 0.08 },
-            uThreshold: { value: 0.03 }
+            uStepSize: { value: Math.min(size.x, size.y, size.z) / 192.0 },
+            uOpacity: { value: 0.12 },
+            uThreshold: { value: 0.02 }
         },
 
         transparent: true,
         depthWrite: false,
+
         depthTest: false,
-        side: THREE.DoubleSide
+
+        side: THREE.BackSide
     });
 
-    const volumeGroup = new THREE.Group();
-    volumeGroup.rotation.x = -Math.PI / 2;
+    renderState.volumeRaymarchMesh = new THREE.Mesh(geometry, material);
 
-    const volumeMesh = new THREE.Mesh(geometry, material);
-    volumeMesh.position.copy(center);
-    volumeMesh.scale.copy(size);
+    renderState.volumeRaymarchMesh.rotation.x = -Math.PI / 2;
 
-    volumeMesh.frustumCulled = false;
-    volumeMesh.renderOrder = 10;
+    renderState.volumeRaymarchMesh.renderOrder = Infinity;
 
-    volumeGroup.add(volumeMesh);
-    scene.add(volumeGroup);
-
-    renderState.volumeRaymarchMesh = volumeMesh;
-    renderState.volumeRaymarchGroup = volumeGroup;
+    scene.add(renderState.volumeRaymarchMesh);
 }
 
 const _volumeLocalCamera = new THREE.Vector3();
@@ -730,7 +645,7 @@ export function updateVolumeRaymarching(frameData) {
 export function clearVolumeRaymarching() {
     if (!renderState.volumeRaymarchMesh) return;
 
-    scene.remove(renderState.volumeRaymarchGroup);
+    scene.remove(renderState.volumeRaymarchMesh);
 
     renderState.volumeRaymarchMesh.geometry.dispose();
     renderState.volumeRaymarchMesh.material.dispose();
@@ -740,7 +655,6 @@ export function clearVolumeRaymarching() {
     }
 
     renderState.volumeRaymarchMesh = null;
-    renderState.volumeRaymarchGroup = null;
     renderState.volumeTexture = null;
     renderState.volumeGridInfo = null;
 }
@@ -1026,59 +940,6 @@ export function clearGrid() {
     renderState.grid = null;
 }
 
-export function initSolidCells({ raw, count, voxelSize }) {
-    clearSolidCells();
-    if (count === 0) return;
-
-    const buckets = { solid: [], emitter: [], intake: [] };
-    for (let i = 0; i < count; i++) {
-        const x = raw[i * 4], y = raw[i * 4 + 1], z = raw[i * 4 + 2];
-        const t = raw[i * 4 + 3];
-        if (t === 1) buckets.solid.push(x, y, z);
-        else if (t === 2) buckets.emitter.push(x, y, z);
-        else if (t === 3) buckets.intake.push(x, y, z);
-    }
-
-    const specs = [
-        { key: 'solid',   color: 0x888888, opacity: 0.15, renderOrder: 0 },
-        { key: 'emitter', color: 0x0088ff, opacity: 0.7,  renderOrder: 1 },
-        { key: 'intake',  color: 0xff8800, opacity: 0.7,  renderOrder: 1 },
-    ];
-
-    const meshes = [];
-    for (const { key, color, opacity, renderOrder } of specs) {
-        const pts = buckets[key];
-        if (pts.length === 0) continue;
-        const n = pts.length / 3;
-        const geo = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
-        const im = new THREE.InstancedMesh(geo, mat, n);
-        im.renderOrder = renderOrder;
-        const dummy = new THREE.Object3D();
-        for (let i = 0; i < n; i++) {
-            dummy.position.set(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2]);
-            dummy.updateMatrix();
-            im.setMatrixAt(i, dummy.matrix);
-        }
-        im.instanceMatrix.needsUpdate = true;
-        im.rotation.x = -Math.PI / 2;
-        meshes.push(im);
-        scene.add(im);
-    }
-
-    renderState.solidCells = meshes;
-}
-
-export function clearSolidCells() {
-    if (!renderState.solidCells) return;
-    for (const m of renderState.solidCells) {
-        scene.remove(m);
-        m.geometry.dispose();
-        m.material.dispose();
-    }
-    renderState.solidCells = null;
-}
-
 let _emitVoxel = null, _intakeVoxel = null;
 const _emitVoxelMat   = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.6 });
 const _intakeVoxelMat = new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.6 });
@@ -1139,6 +1000,4 @@ window.addEventListener('resize', () => {
         renderState.grid.material.resolution.set(window.innerWidth, window.innerHeight);
     if (renderState.splatViewport)
         renderState.splatViewport.set(renderer.domElement.width, renderer.domElement.height);
-    if (renderState.meshPointCloud)
-        renderState.meshPointCloud.material.uniforms.uResolutionY.value = renderer.domElement.height;
 });

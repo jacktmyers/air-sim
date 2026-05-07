@@ -58,18 +58,6 @@ export async function saveScene() {
 
 export function onSimStopped(cb) { simStoppedCallback = cb; }
 
-export async function fetchSolidCells() {
-    const res = await fetch(`http://localhost:${HOSTED_PORT}/sim/solid_cells`);
-    if (!res.ok) return null;
-    const buf = await res.arrayBuffer();
-    const view = new DataView(buf);
-    const count = view.getUint32(0, true);
-    const voxelSize = view.getFloat32(4, true);
-    // stride 4: [x, y, z, type]  type: 1=Solid, 2=Emitter, 3=Intake
-    const raw = new Float32Array(buf, 8, count * 4);
-    return { raw, count, voxelSize };
-}
-
 export function sendConfig() {
     fetch(`http://localhost:${HOSTED_PORT}/configure`, {
         method: 'POST',
