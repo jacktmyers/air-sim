@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, fpControls, enterDollhouseMode, enterWalkthroughMode, walkthroughMode, setWalkSpeed, raycaster, pointer, initStreamlines, clearStreamlines, clearVolumeRaymarching, initVolumeRaymarching } from './render.js';
+import { acGroup, renderState, initGrid, clearGrid, initACVoxels, clearACVoxels, worldToPly, setPlacementAngle, setACNormal, setOutflowAngle, setInflowAngle, getOutflowConfig, getInflowConfig, setDisplayScale, setSplatTransform, renderer, camera, controls, fpControls, enterDollhouseMode, enterWalkthroughMode, walkthroughMode, setWalkSpeed, raycaster, pointer, initStreamlines, clearStreamlines, clearVolumeRaymarching, initVolumeRaymarching, setMeshPointCloudMode, setMeshPointSize } from './render.js';
 
 import { simConfig, simState } from './simulation.js';
 import { sendConfig, startSim, stopSim, onSimStopped } from './connection.js';
@@ -244,7 +244,24 @@ showSplatToggle.addEventListener('change', () => {
     if (renderState.splats) renderState.splats.visible = showSplatToggle.checked;
 });
 showMeshToggle.addEventListener('change', () => {
-    if (renderState.mesh) renderState.mesh.visible = showMeshToggle.checked;
+    if (renderState.mesh) renderState.mesh.visible = showMeshToggle.checked && !renderState.meshPointCloudMode;
+    if (renderState.meshPointCloud) renderState.meshPointCloud.visible = showMeshToggle.checked && renderState.meshPointCloudMode;
+});
+
+const meshPointCloudToggle = document.getElementById('meshPointCloudToggle');
+const pointSizeInput       = document.getElementById('pointSizeInput');
+const pointSizeDisplay     = document.getElementById('pointSizeDisplay');
+
+meshPointCloudToggle.addEventListener('change', () => {
+    const enabled = meshPointCloudToggle.checked;
+    if (showMeshToggle.checked) setMeshPointCloudMode(enabled);
+    else renderState.meshPointCloudMode = enabled;
+});
+
+pointSizeInput.addEventListener('input', () => {
+    const size = parseFloat(pointSizeInput.value);
+    pointSizeDisplay.textContent = size.toFixed(3);
+    setMeshPointSize(size);
 });
 
 const walkthroughToggle = document.getElementById('walkthroughToggle');

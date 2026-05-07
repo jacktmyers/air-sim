@@ -250,6 +250,8 @@ export function getInflowConfig() {
 
 export const renderState = {
     mesh: null,
+    meshPointCloud: null,
+    meshPointCloudMode: false,
     simPoints: null,
     simSpeedBuffer: null,
     streamlines: null,
@@ -314,7 +316,60 @@ export function initShaderMaterial({ vertexShader, fragmentShader }, uniforms) {
     return new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, side: THREE.FrontSide });
 }
 
+export function setMeshPointCloudMode(enabled) {
+    renderState.meshPointCloudMode = enabled;
+    if (renderState.mesh) renderState.mesh.visible = !enabled;
+    if (renderState.meshPointCloud) renderState.meshPointCloud.visible = enabled;
+}
+
+export function setMeshPointSize(size) {
+    if (renderState.meshPointCloud) renderState.meshPointCloud.material.uniforms.uPointSize.value = size;
+}
+
+const _pointCloudVert = /* glsl */`
+attribute vec3 color;
+varying vec3 vColor;
+uniform float uPointSize;
+uniform float uResolutionY;
+
+void main() {
+    vColor = color;
+
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+
+    // Back-face cull: discard points whose surface normal faces away from camera
+    vec3 vsNormal = normalize(normalMatrix * normal);
+    vec3 vsViewDir = normalize(-mvPosition.xyz);
+    if (dot(vsNormal, vsViewDir) <= 0.0) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        gl_PointSize = 0.0;
+        return;
+    }
+
+    gl_Position = projectionMatrix * mvPosition;
+    // World-unit size with perspective attenuation
+    gl_PointSize = uPointSize * projectionMatrix[1][1] * uResolutionY * 0.5 / (-mvPosition.z);
+}
+`;
+
+const _pointCloudFrag = /* glsl */`
+varying vec3 vColor;
+
+void main() {
+    // Circular point
+    vec2 c = gl_PointCoord - 0.5;
+    if (dot(c, c) > 0.25) discard;
+    gl_FragColor = vec4(vColor, 1.0);
+}
+`;
+
 export function initMesh(vertices, colors, faces) {
+    if (renderState.meshPointCloud) {
+        scene.remove(renderState.meshPointCloud);
+        renderState.meshPointCloud.geometry.dispose();
+        renderState.meshPointCloud.material.dispose();
+        renderState.meshPointCloud = null;
+    }
     if (renderState.mesh) {
         scene.remove(renderState.mesh);
         renderState.mesh.geometry.dispose();
@@ -330,7 +385,29 @@ export function initMesh(vertices, colors, faces) {
     const material = initShaderMaterial(renderState.meshShaderSources);
     renderState.mesh = new THREE.Mesh(geometry, material);
     renderState.mesh.rotation.x = -Math.PI / 2;
+    renderState.mesh.visible = !renderState.meshPointCloudMode;
     scene.add(renderState.mesh);
+
+    const pointsGeo = new THREE.BufferGeometry();
+    pointsGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    // Normals are needed for back-face culling in the point shader
+    pointsGeo.setAttribute('normal', geometry.attributes.normal.clone());
+    const hasColor = colors && colors.length > 0;
+    const fallbackColors = hasColor ? colors : new Array(vertices.length).fill(0.8);
+    pointsGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(fallbackColors), 3));
+    const pointsMat = new THREE.ShaderMaterial({
+        vertexShader: _pointCloudVert,
+        fragmentShader: _pointCloudFrag,
+        uniforms: {
+            uPointSize:   { value: 0.02 },
+            uResolutionY: { value: renderer.domElement.height },
+        },
+    });
+    renderState.meshPointCloud = new THREE.Points(pointsGeo, pointsMat);
+    renderState.meshPointCloud.rotation.x = -Math.PI / 2;
+    renderState.meshPointCloud.visible = renderState.meshPointCloudMode;
+    scene.add(renderState.meshPointCloud);
+
     console.log(`Mesh loaded: ${vertices.length / 3} vertices, ${faces.length / 3} triangles`);
 
     // PLY Z → world Y after RotX(-π/2); align camera to vertical midpoint
@@ -1008,4 +1085,6 @@ window.addEventListener('resize', () => {
         renderState.grid.material.resolution.set(window.innerWidth, window.innerHeight);
     if (renderState.splatViewport)
         renderState.splatViewport.set(renderer.domElement.width, renderer.domElement.height);
+    if (renderState.meshPointCloud)
+        renderState.meshPointCloud.material.uniforms.uResolutionY.value = renderer.domElement.height;
 });
